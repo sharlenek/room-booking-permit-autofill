@@ -64,7 +64,11 @@ var UFRA_SCHEMA = (function () {
 
   var STOPWORDS = ['the', 'a', 'an', 'of', 'for', 'your', 'please', 'enter',
     'select', 'choose', 'required', 'optional', 'is', 'are', 'be', 'will',
-    'this', 'and', 'or', 'to', 'in', 'on', 'at', 'if', 'any'];
+    'this', 'and', 'or', 'to', 'in', 'on', 'at', 'if', 'any',
+    // EMS phrases nearly every prompt as an instruction or a question.
+    'indicate', 'provide', 'specify', 'describe', 'list', 'you', 'your',
+    'that', 'apply', 'all', 'as', 'it', 'there', 'such', 'may', 'we',
+    'do', 'does', 'have', 'has', 'was', 'were', 'would', 'could', 'should'];
 
   function normalize(s) {
     return String(s == null ? '' : s)
@@ -77,10 +81,37 @@ var UFRA_SCHEMA = (function () {
       .trim();
   }
 
+  /* Crude suffix stripping, applied to both sides of every comparison so it
+     only has to be self-consistent, not linguistically correct. It is what
+     lets "expect to attend" reach "Expected Attendance". */
+  function stem(t) {
+    if (t.length > 4) {
+      t = t.replace(/(ees|ies|es|s)$/, function (m) { return m === 'ies' ? 'y' : ''; });
+    }
+    if (t.length > 5) {
+      t = t.replace(/(ances|ance|ments|ment|ings|ing|ions|ion|ed|al)$/, '');
+    }
+    return t;
+  }
+
   function tokens(s) {
     return normalize(s).split(' ').filter(function (t) {
       return t && STOPWORDS.indexOf(t) === -1;
-    });
+    }).map(stem);
+  }
+
+  /* EMS asks most of its questions as yes/no prompts. A polar question wants
+     a yes/no answer, never an organization name. */
+  var POLAR_START = /^(is|are|was|were|will|would|do|does|did|have|has|can|could|should|may|must)\b/;
+
+  function isPolarQuestion(label) {
+    return POLAR_START.test(normalize(label));
+  }
+
+  var POLAR_VALUE = /^(y|yes|n|no|true|false|n\/a|none|not applicable)$/i;
+
+  function isPolarValue(v) {
+    return POLAR_VALUE.test(String(v == null ? '' : v).trim());
   }
 
   function qualifiersIn(s) {
@@ -94,6 +125,9 @@ var UFRA_SCHEMA = (function () {
     normalize: normalize,
     tokens: tokens,
     qualifiersIn: qualifiersIn,
+    stem: stem,
+    isPolarQuestion: isPolarQuestion,
+    isPolarValue: isPolarValue,
     synonymsFor: function (canon) { return FIELDS[canon] || []; },
     canonKeys: function () { return Object.keys(FIELDS); }
   };

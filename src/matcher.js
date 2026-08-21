@@ -21,14 +21,33 @@ var UFRA_MATCH = (function (S) {
       var extra = S.tokens(ln).length - S.tokens(pn).length;
       score = 0.92 - Math.min(0.3, Math.max(0, extra) * 0.05);
     } else {
-      score = 0.75 * jaccard(S.tokens(ln), S.tokens(pn));
+      // EMS writes prompts as whole sentences ("Indicate how many people you
+      // expect to attend"), so the synonym's words are present but scattered
+      // and far apart. Score by how much of the *synonym* the label covers,
+      // not by overlap of the two token sets: a long label should not be
+      // punished for being long, only for missing the words that matter.
+      var pt = S.tokens(pn);
+      var cov = coverage(pt, S.tokens(ln));
+      if (cov === 1) {
+        // Every word present but out of order: good evidence, not proof.
+        score = pt.length > 1 ? 0.78 : 0.68;
+      } else {
+        score = 0.78 * cov * cov;   // partial coverage is weak evidence
+      }
     }
 
     // A qualifier on one side but not the other ("advisor email" vs "email")
     // usually means these are different fields, not loose wordings.
     var lq = S.qualifiersIn(ln);
     var pq = S.qualifiersIn(pn);
-    if (lq.some(function (q) { return pq.indexOf(q) === -1; })) score *= 0.35;
+
+    // Only trust a qualifier in a label that reads as a field *name*. In a
+    // sentence-length prompt the word is usually incidental -- "vendor" inside
+    // "a ticket, registration, admission, vendor or similar fee" qualifies
+    // nothing, and penalising it loses a correct match.
+    if (S.tokens(ln).length <= 6 &&
+        lq.some(function (q) { return pq.indexOf(q) === -1; })) score *= 0.35;
+
     if (pq.some(function (q) { return lq.indexOf(q) === -1; })) score *= 0.5;
 
     return score;
@@ -37,6 +56,15 @@ var UFRA_MATCH = (function (S) {
   function containsPhrase(haystack, needle) {
     var esc = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     return new RegExp('(^|\\s)' + esc + '($|\\s)').test(haystack);
+  }
+
+  /* Fraction of the needle's tokens that appear anywhere in the haystack. */
+  function coverage(needle, haystack) {
+    if (!needle.length) return 0;
+    var set = {};
+    haystack.forEach(function (t) { set[t] = true; });
+    var hits = needle.filter(function (t) { return set[t]; }).length;
+    return hits / needle.length;
   }
 
   function jaccard(a, b) {
@@ -63,6 +91,12 @@ var UFRA_MATCH = (function (S) {
         if (s > best) best = s;
       });
     }
+
+    // "Is your organization registered as tax exempt?" shares the word
+    // "organization" with the Organization Name column, but a yes/no question
+    // can never want a name as its answer.
+    if (S.isPolarQuestion(pageLabel) && !S.isPolarValue(field.value)) best *= 0.3;
+
     return best;
   }
 
