@@ -1,0 +1,36 @@
+<meta charset="utf-8">
+<title>UF Reservation Autofill</title>
+<link rel="stylesheet" href="styles.css">
+<style>body { width: 360px; }</style>
+<header>
+  <div class="mark"></div>
+  <h1>UF Reservation Autofill</h1>
+</header>
+<main>
+  <div id="empty" class="note small" hidden>
+    No event data imported yet. <a href="#" id="toOptions1">Import your sheet</a> to get started.
+  </div>
+
+  <div id="ready" hidden>
+    <label class="field">
+      <span>Event</span>
+      <select id="event"></select>
+    </label>
+    <div class="row">
+      <button id="fill">Fill Form</button>
+      <button id="clear" class="secondary">Clear highlights</button>
+    </div>
+    <p class="small muted" style="margin:10px 0 0">
+      Only empty fields are filled. Nothing is ever submitted.
+    </p>
+    <div id="report" class="report" hidden></div>
+  </div>
+
+  <p class="small muted" style="margin:14px 0 0">
+    <a href="#" id="toOptions2">Manage imported data</a>
+    <span id="stamp"></span>
+  </p>
+</main>
+<script src="src/schema.js"></script>
+<script src="src/matcher.js"></script>
+<script src="popup.js"></script>

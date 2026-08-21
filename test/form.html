@@ -1,0 +1,66 @@
+<form id="ems">
+  <div class="form-group">
+    <label for="evName">Event Title *</label>
+    <input type="text" id="evName" name="EventName">
+  </div>
+  <div class="form-group">
+    <label for="evDate">Date of Event</label>
+    <input type="date" id="evDate" name="EventDate">
+  </div>
+  <div class="form-group">
+    <label for="st">Start Time</label>
+    <input type="time" id="st" name="StartTime">
+  </div>
+  <div class="form-group">
+    <label for="et">End Time</label>
+    <input type="time" id="et" name="EndTime">
+  </div>
+  <div class="form-group">
+    <label for="att">Anticipated Attendance</label>
+    <input type="number" id="att" name="Attendance">
+  </div>
+  <div class="form-group">
+    <label for="loc">Requested Location</label>
+    <input type="text" id="loc" name="Location">
+  </div>
+  <div class="form-group">
+    <label for="org">Name of Requesting Organization</label>
+    <input type="text" id="org" name="Org">
+  </div>
+  <div class="form-group">
+    <label for="em">E-mail Address</label>
+    <input type="email" id="em" name="Email">
+  </div>
+  <div class="form-group">
+    <label for="adv">Faculty Advisor E-mail</label>
+    <input type="email" id="adv" name="AdvisorEmail">
+  </div>
+  <div class="form-group">
+    <label for="desc">Brief Description of Event</label>
+    <textarea id="desc" name="Description"></textarea>
+  </div>
+  <div class="form-group">
+    <label for="type">Event Type</label>
+    <select id="type" name="EventType">
+      <option value="">-- Select --</option>
+      <option value="mtg">Meeting</option>
+      <option value="soc">Social Event</option>
+      <option value="lec">Lecture</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="phone">Phone Number</label>
+    <input type="text" id="phone" name="Phone" value="352-000-0000">
+  </div>
+  <div class="form-group">
+    <label>Will food be served?</label>
+    <label><input type="radio" name="food" value="y"> Yes</label>
+    <label><input type="radio" name="food" value="n"> No</label>
+  </div>
+  <div class="form-group">
+    <label for="parking">Parking Pass Number</label>
+    <input type="text" id="parking" name="Parking">
+  </div>
+  <input type="hidden" name="csrf" value="abc">
+  <button type="submit">Submit Reservation</button>
+</form>

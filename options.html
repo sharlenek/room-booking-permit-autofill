@@ -1,0 +1,47 @@
+<meta charset="utf-8">
+<title>UF Reservation Autofill — Data</title>
+<link rel="stylesheet" href="styles.css">
+<style>body { max-width: 900px; margin: 0 auto; }</style>
+<header>
+  <div class="mark"></div>
+  <h1>UF Reservation Autofill — Imported Data</h1>
+</header>
+<main>
+  <p class="note small">
+    In Google Sheets choose <b>File › Download › Comma-separated values</b>, then paste the
+    contents below or pick the downloaded file. Data stays on this computer.
+  </p>
+
+  <div class="cols" style="margin-top:16px">
+    <section>
+      <h2>Organization details</h2>
+      <p class="small muted">Permanent info reused on every form. Either two columns
+        (<code>Field,Value</code> per row) or a header row plus one data row.</p>
+      <label class="field">
+        <input type="file" id="orgFile" accept=".csv,text/csv">
+      </label>
+      <textarea id="orgCsv" placeholder="Organization Name,Citrus Club&#10;Contact Email,you@ufl.edu&#10;Faculty Advisor,Dr. Reyes"></textarea>
+    </section>
+
+    <section>
+      <h2>Events</h2>
+      <p class="small muted">One header row, then one row per event.</p>
+      <label class="field">
+        <input type="file" id="eventsFile" accept=".csv,text/csv">
+      </label>
+      <textarea id="eventsCsv" placeholder="Event Name,Date,Start Time,End Time,Expected Attendance,Location,Description&#10;Grove Day,9/12/2026,3:00 PM,5:00 PM,75,Reitz Union 2365,Annual member social"></textarea>
+    </section>
+  </div>
+
+  <div class="row" style="margin-top:8px">
+    <button id="save">Import</button>
+    <button id="erase" class="secondary">Erase all data</button>
+    <span id="status" class="small muted"></span>
+  </div>
+
+  <div id="preview" style="margin-top:22px"></div>
+</main>
+<script src="src/csv.js"></script>
+<script src="src/schema.js"></script>
+<script src="src/matcher.js"></script>
+<script src="options.js"></script>

@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "UF Reservation Autofill",
+  "version": "0.1.0",
+  "description": "Fill UF EMS Cloud room reservations and event permit forms from your imported Google Sheet data. Never submits.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "action": {
+    "default_title": "UF Reservation Autofill",
+    "default_popup": "popup.html"
+  },
+  "options_page": "options.html",
+  "icons": {
+    "128": "icons/icon128.png"
+  }
+}
