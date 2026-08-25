@@ -58,6 +58,9 @@ var UFRA_SCHEMA = (function () {
   var QUALIFIERS = [
     'advisor', 'adviser', 'faculty', 'supervisor', 'sponsor', 'emergency',
     'alternate', 'alternative', 'secondary', 'second', 'backup', 'rain',
+    // EMS numbers its contact slots "1st Contact", "2nd Contact". Anything
+    // past the first is a different person; "1st" is deliberately absent.
+    '2nd', '3rd', '4th', 'third', 'fourth',
     'billing', 'guest', 'speaker', 'vendor', 'parent', 'spouse', 'setup',
     'teardown', 'cleanup', 'end', 'confirm', 'verify', 'repeat'
   ];
