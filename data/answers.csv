@@ -5,3 +5,6 @@ sensitive topics,No,ems
 in collaboration with another organization,No,ems
 under the age of 18,No,ems
 admission fee,No,ems
+*,No,gatorconnect
+space reservation confirmation,Yes,gatorconnect
+organization members,Yes,gatorconnect

@@ -67,6 +67,11 @@ falling back to the requested date and time for anything it leaves out. It click
 "+ add another date" and "In-Person" as needed, types the Description into the rich-text
 editor, and leaves Theme, Categories, Perks, Show To and the co-host search to you. The
 form spans several pages; click Fill Form on each.
+
+**Writing Finalized Information.** On an EMS reservation page, open *Finalized Information*
+in the popup and press **Read bookings from this page**; or convert the .ics file from
+*Add to My Calendar* on the settings page. Either gives one line per booking —
+`10/06/2026, 6:00pm - 8:00pm, Leigh Hall 0207` — to paste into the sheet.
 If a separate *Reservation Date* column disagrees with it, date fields are filled but outlined
 for review.
 
@@ -99,6 +104,7 @@ node test/compound.js # "advisor, email and phone" in one box
 node test/answers.js  # Registrar Yes/No menus answered from data/answers.csv
 node test/bookings.js # Bookings read from real Finalized Information cells
 node test/gatorconnect.js # GatorConnect Create Event, several dates
+node test/finalize.js # Finalized Information from an EMS page and an .ics file
 ```
 
 ## Layout
@@ -108,6 +114,7 @@ node test/gatorconnect.js # GatorConnect Create Event, several dates
 | [src/csv.js](src/csv.js) | RFC-4180 parser for CSV and copied (tab-separated) cells; detects key/value vs header+row sheets |
 | [src/row.js](src/row.js) | Pasted row → fields: header matching, tracking columns, date/time range splitting |
 | [src/bookings.js](src/bookings.js) | Free-text cell → Bookings (date, times, room), guessing years and am/pm |
+| [src/finalize.js](src/finalize.js) | Finalized Information written from an EMS reservation page or an .ics file |
 | [src/forms.js](src/forms.js) | Form detection; GatorConnect's extra dates, In-Person button, Description editor |
 | [src/answers.js](src/answers.js) | Standing Yes/No answers: attendance thresholds, data/answers.csv, acknowledgements |
 | [src/schema.js](src/schema.js) | Canonical fields, synonyms, qualifier words, normalisation |

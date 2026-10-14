@@ -39,10 +39,25 @@
   </div>
 
   <div id="preview" style="margin-top:22px"></div>
+
+  <section id="ics" style="margin-top:28px">
+    <h2>Finalized Information from an .ics file</h2>
+    <p class="small muted">Pick the calendar file EMS gives you with <b>Add to My Calendar</b>.
+      Each booking comes out on its own line, ready to paste into your sheet's Finalized
+      Information cell. Cancelled bookings are left out.</p>
+    <label class="field"><input type="file" id="icsFile" accept=".ics,text/calendar"></label>
+    <textarea id="icsOut" readonly placeholder="10/06/2026, 6:00pm - 8:00pm, Leigh Hall 0207"></textarea>
+    <div class="row" style="margin-top:6px">
+      <button id="copyIcs" class="secondary">Copy</button>
+      <span id="icsNote" class="small muted"></span>
+    </div>
+  </section>
 </main>
 <script src="src/csv.js"></script>
 <script src="src/schema.js"></script>
 <script src="src/matcher.js"></script>
+<script src="src/bookings.js"></script>
 <script src="src/row.js"></script>
+<script src="src/finalize.js"></script>
 <script src="src/datafiles.js"></script>
 <script src="options.js"></script>

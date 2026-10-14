@@ -11,8 +11,9 @@ var UFRA_DATAFILES = (function () {
   }
 
   async function load() {
-    var texts = await Promise.all([read('org.csv'), read('sheet-header.txt'), read('answers.csv')]);
-    return { orgText: texts[0], headerText: texts[1], answersText: texts[2] };
+    var texts = await Promise.all([read('org.csv'), read('sheet-header.txt'), read('answers.csv'),
+                                   read('buildings.csv')]);
+    return { orgText: texts[0], headerText: texts[1], answersText: texts[2], buildingsText: texts[3] };
   }
 
   return { load: load };

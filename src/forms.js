@@ -24,15 +24,42 @@ var UFRA_FORMS = (function () {
 
   function sameDay(a, b) { return a && b && a.y === b.y && a.m === b.m && a.d === b.d; }
 
-  /* The first visible control whose text matches, within root. */
-  function findClickable(ctx, root, re) {
+  /* Visible controls whose own text matches, within root, in page order.
+     A button input's text is its value, not whatever label sits nearby. */
+  function findClickables(ctx, root, re) {
     var els = root.querySelectorAll('button, a, label, [role="button"], [role="radio"], [role="tab"], ' +
       'input[type="button"], input[type="radio"]');
-    return Array.prototype.find.call(els, function (el) {
+    return Array.prototype.filter.call(els, function (el) {
       if (!ctx.isVisible(el)) return false;
-      var text = el.tagName === 'INPUT' ? (ctx.labelOf(el) || el.value) : ctx.textOf(el);
-      return re.test(String(text || '').trim());
+      var text = el.tagName !== 'INPUT' ? ctx.textOf(el)
+        : (el.type === 'button' || el.type === 'submit' ? el.value : ctx.labelOf(el));
+      return re.test(String(text || '').replace(/\s+/g, ' ').trim());
+    });
+  }
+
+  function findClickable(ctx, root, re) {
+    return findClickables(ctx, root, re)[0] || null;
+  }
+
+  /* The button for one Booking: inside a block holding only that Booking,
+     otherwise the first one after the Booking's start date -- never another
+     Booking's button. */
+  function clickableFor(ctx, start, loc, re) {
+    var block = commonBlock(start, loc);
+    var ownBlock = block.querySelectorAll('[name$=".StartDate"]').length === 1;
+    var own = ownBlock && findClickable(ctx, block, re);
+    if (own) return own;
+    return findClickables(ctx, start.ownerDocument, re).find(function (el) {
+      return start.compareDocumentPosition(el) & 4;   // DOCUMENT_POSITION_FOLLOWING
     }) || null;
+  }
+
+  /* The pop-up holding a field: its nearest ancestor with a SAVE button. */
+  function dialogAround(ctx, el) {
+    for (var n = el.parentElement; n && n !== el.ownerDocument.body; n = n.parentElement) {
+      if (findClickable(ctx, n, /^save$/i)) return n;
+    }
+    return null;
   }
 
   /* The smallest ancestor of a that also holds b: one Booking's block. */
@@ -80,7 +107,14 @@ var UFRA_FORMS = (function () {
     today = { y: today.getFullYear(), m: today.getMonth() + 1, d: today.getDate() };
     var room = ctx.fields.find(function (f) { return f.canon === 'location' && f.value; });
 
-    for (var k = 0; k < sessions.length; k++) {
+    // Dates and places live on the first page only.
+    var basics = !!byName(doc, 'Instances[0].StartDate');
+
+    // With no usable date the first Booking still gets its room.
+    var noDates = !sessions.length;
+    if (noDates) sessions = [{ place: '' }];
+
+    for (var k = 0; basics && k < sessions.length; k++) {
       var s = sessions[k];
       var nth = sessions.length > 1 ? ' (date ' + (k + 1) + ')' : '';
       var prefix = 'Instances[' + k + '].';
@@ -88,7 +122,8 @@ var UFRA_FORMS = (function () {
       // 1. One Booking per date, adding Bookings with "+ add another date".
       var created = false;
       if (!byName(doc, prefix + 'StartDate')) {
-        var add = findClickable(ctx, doc, /^\+?\s*add another date$/i);
+        // "add ADD ANOTHER DATE": a Material icon named "add", then the text.
+        var add = findClickable(ctx, doc, /add another date$/i);
         if (!add) {
           out.push({ el: doc.body, status: 'skipped', label: 'Date ' + (k + 1) + ' of ' + sessions.length,
                      note: 'could not find "+ add another date"' });
@@ -99,13 +134,13 @@ var UFRA_FORMS = (function () {
         created = true;
       }
 
-      var els = ['StartDate', 'StartTime', 'EndDate', 'EndTime'].map(function (f) { return byName(doc, prefix + f); });
+      var els = noDates ? [] : ['StartDate', 'StartTime', 'EndDate', 'EndTime'].map(function (f) { return byName(doc, prefix + f); });
       // GatorConnect starts every Booking on today's date. Anything else was
       // set by the user and stays.
       var untouched = created || (els[0] && els[2] &&
         sameDay(ctx.parseDate(els[0].value), today) && sameDay(ctx.parseDate(els[2].value), today));
-      var values = [gcDate(ctx.parseDate(s.date)), gcTime(ctx.parseTime(s.start)),
-                    gcDate(ctx.parseDate(s.date)), gcTime(ctx.parseTime(s.end))];
+      var values = noDates ? [] : [gcDate(ctx.parseDate(s.date)), gcTime(ctx.parseTime(s.start)),
+                                   gcDate(ctx.parseDate(s.date)), gcTime(ctx.parseTime(s.end))];
       ['Start Date', 'Start Time', 'End Date', 'End Time'].forEach(function (name, i) {
         var el = els[i];
         if (!el) return;
@@ -126,20 +161,44 @@ var UFRA_FORMS = (function () {
       var loc = byName(doc, prefix + 'ExternalLocation');
       if (!place || !start || !loc) continue;
       if (!ctx.isVisible(loc)) {
-        var btn = findClickable(ctx, commonBlock(start, loc), /^in[\s-]?person$/i);
+        // GatorConnect's in-person choice is the "Location" button, beside
+        // "Online Location" and "Clear Location".
+        var btn = clickableFor(ctx, start, loc, /^(location|in[\s-]?person)$/i);
         if (btn) {
           btn.click();
           await ctx.waitFor(function () { return ctx.isVisible(loc); });
         }
       }
       if (!ctx.isVisible(loc)) {
-        out.push({ el: loc, status: 'skipped', label: 'Location Name' + nth, note: 'could not find the In-Person button' });
+        out.push({ el: loc, status: 'skipped', label: 'Location Name' + nth, note: 'could not find the "Location" button' });
         continue;
       }
-      if (String(loc.value).trim()) { out.push({ el: loc, status: 'prefilled', label: 'Location Name' + nth }); continue; }
-      ctx.setValue(loc, place);
-      ctx.highlight(loc, 'from "' + placeFrom + '" — check it is the room you got');
-      out.push({ el: loc, status: 'review', label: 'Location Name' + nth, from: placeFrom, value: place });
+      // The Location pop-up, in the order a person would go: say no to the
+      // map first (it can redraw the pop-up), type the room, then SAVE.
+      var dialog = dialogAround(ctx, loc);
+      var noMap = dialog && findClickable(ctx, dialog, /^no\b.*\bmap\b/i);
+      if (noMap) {
+        noMap.click();
+        await ctx.waitFor(function () { return ctx.isVisible(loc); });
+      }
+
+      // A date this fill added may arrive with the previous date's room
+      // copied in; only a room on a date that was already there is the user's.
+      if (String(loc.value).trim() && !created) {
+        out.push({ el: loc, status: 'prefilled', label: 'Location Name' + nth });
+      } else {
+        ctx.setValue(loc, place);
+        ctx.highlight(loc, 'from "' + placeFrom + '" — check it is the room you got');
+        out.push({ el: loc, status: 'review', label: 'Location Name' + nth, from: placeFrom, value: place });
+      }
+
+      var save = dialog && findClickable(ctx, dialog, /^save$/i);
+      if (save) {
+        save.click();
+        await ctx.waitFor(function () { return !ctx.isVisible(save); });
+      } else if (dialog) {
+        out.push({ el: doc.body, status: 'skipped', label: 'Location' + nth, note: 'could not find SAVE in the Location pop-up' });
+      }
     }
 
     // 3. Description, typed into the rich-text editor.
@@ -177,7 +236,10 @@ var UFRA_FORMS = (function () {
     var host = String((loc && loc.hostname) || '').toLowerCase();
     var path = String((loc && loc.pathname) || '');
     if (host === 'gatorconnect.ufl.edu') return FORMS.gatorconnect;
-    if (host === 'rooms.ufl.edu' || /emswebapp/i.test(path)) return FORMS.ems;
+    // UF's EMS lives at ufl.emscloudservice.com; rooms.ufl.edu links to it.
+    if (/(^|\.)emscloudservice\.com$/.test(host) || host === 'rooms.ufl.edu' || /emswebapp/i.test(path)) {
+      return FORMS.ems;
+    }
     return FORMS.other;
   }
 

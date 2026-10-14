@@ -84,6 +84,7 @@ async function load() {
   if (files.orgText) state.org = annotate(UFRA_CSV.parseRecord(files.orgText));
   if (files.headerText) state.headers = UFRA_CSV.parse(files.headerText)[0] || [];
   state.answers = files.answersText ? UFRA_ANSWERS.fromCsvRows(UFRA_CSV.parse(files.answersText)) : [];
+  state.buildings = files.buildingsText ? UFRA_FINALIZE.buildingsFrom(UFRA_CSV.parse(files.buildingsText)) : [];
 
   // Which Form this tab is, so a wrong guess is visible before filling.
   try {
@@ -151,6 +152,14 @@ function mergeReports(results) {
     total.details.push(...r.result.details);
   }
   return total;
+}
+
+function showFinalized(text, count, error) {
+  $('finalizedOut').hidden = !text;
+  $('copyFinalized').hidden = !text;
+  $('finalizedOut').value = text;
+  $('finalizedNote').textContent = error ||
+    (count ? `${count} booking(s), cancelled ones left out.` : 'No bookings found on this page.');
 }
 
 async function main() {
@@ -221,7 +230,34 @@ async function main() {
     }
   });
 
+  $('readBookings').addEventListener('click', async () => {
+    try {
+      const tab = await activeTab();
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: true },
+        files: ['src/bookings.js', 'src/finalize.js']
+      }).then(() => chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: true },
+        func: () => UFRA_FINALIZE.readPage(document)
+      }));
+      const bookings = results.flatMap((r) => r.result || []);
+      showFinalized(UFRA_FINALIZE.format(bookings, state.buildings), bookings.length);
+    } catch (err) {
+      showFinalized('', 0, `Couldn't read this page: ${err.message}`);
+    }
+  });
+
+  $('copyFinalized').addEventListener('click', async () => {
+    await navigator.clipboard.writeText($('finalizedOut').value);
+    $('finalizedNote').textContent = 'Copied — paste it into the Finalized Information cell.';
+  });
+
   document.addEventListener('click', (e) => {
+    if (e.target.closest('.toIcs')) {
+      e.preventDefault();
+      chrome.tabs.create({ url: chrome.runtime.getURL('options.html#ics') });
+      return;
+    }
     if (!e.target.closest('#toOptions2, .toOptions')) return;
     e.preventDefault();
     chrome.runtime.openOptionsPage();

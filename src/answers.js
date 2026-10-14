@@ -16,7 +16,8 @@ var UFRA_ANSWERS = (function (S) {
   function rulesFrom(rows, formId) {
     return (rows || [])
       .map(function (r) {
-        return { phrase: S.normalize(r.phrase), answer: String(r.answer || '').trim(),
+        var phrase = String(r.phrase || '').trim() === '*' ? '*' : S.normalize(r.phrase);
+        return { phrase: phrase, answer: String(r.answer || '').trim(),
                  form: String(r.form || '').trim().toLowerCase() };
       })
       .filter(function (r) {
@@ -45,7 +46,7 @@ var UFRA_ANSWERS = (function (S) {
   function fromRules(prompt, rules) {
     var p = S.normalize(prompt);
     var hit = (rules || []).find(function (r) {
-      return (' ' + p + ' ').indexOf(' ' + r.phrase + ' ') !== -1;
+      return r.phrase !== '*' && (' ' + p + ' ').indexOf(' ' + r.phrase + ' ') !== -1;
     });
     return hit ? { value: hit.answer, label: 'answers.csv: ' + hit.phrase, confidence: 'confident' } : null;
   }
@@ -64,14 +65,35 @@ var UFRA_ANSWERS = (function (S) {
       if (a) return a;
     }
     // Any question mark near the control makes it a question; the prompt is
-    // not always the first text found.
+    // not always the first text found. With no prompt text at all there is
+    // nothing to acknowledge.
     if (prompts.length && prompts.every(isAcknowledgement)) {
       return { value: 'Yes', label: 'acknowledgement', confidence: 'confident' };
+    }
+    // "*" answers every other Yes/No question on its form.
+    var fallback = (rules || []).find(function (r) { return r.phrase === '*'; });
+    return fallback ? { value: fallback.answer, label: 'answers.csv: default', confidence: 'confident' } : null;
+  }
+
+  /* A checkbox, by its own label:
+       none at all      -> an agreement to tick (checked: the user cannot
+                           see what it agrees to from the report)
+       a standing answer for that label ("organization members")
+       "No" / "None"    -> ticked when the form's default answer is No */
+  function checkbox(ownLabel, rules) {
+    if (!String(ownLabel || '').trim()) {
+      return { value: 'Yes', label: 'agreement checkbox', confidence: 'uncertain' };
+    }
+    var hit = fromRules(ownLabel, rules);
+    if (hit) return hit;
+    var fallback = (rules || []).find(function (r) { return r.phrase === '*'; });
+    if (fallback && /^(no|none)$/i.test(ownLabel.trim()) && /^no$/i.test(fallback.answer)) {
+      return { value: 'Yes', label: 'answers.csv: default', confidence: 'confident' };
     }
     return null;
   }
 
-  return { fromCsvRows: fromCsvRows, rulesFrom: rulesFrom, answer: answer, isAcknowledgement: isAcknowledgement };
+  return { checkbox: checkbox, fromCsvRows: fromCsvRows, rulesFrom: rulesFrom, answer: answer, isAcknowledgement: isAcknowledgement };
 })(typeof UFRA_SCHEMA !== 'undefined' ? UFRA_SCHEMA : require('./schema.js'));
 
 if (typeof module !== 'undefined') module.exports = UFRA_ANSWERS;

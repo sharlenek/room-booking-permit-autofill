@@ -71,6 +71,9 @@ var UFRA_ROW = (function (CSV, M, B) {
     headers.forEach(function (header, i) {
       var h = String(header || '');
       if (/finali[sz]ed/i.test(h)) { finalized = { label: h, value: values[i] }; return; }
+      // Only a date or time column is ever the request; a description that
+      // mentions "on 9/24 from 6-8pm" is not, and its prose is not a room.
+      if (!/date|time/i.test(h)) return;
       var read = B.parse(values[i]);
       if (!read.bookings.some(function (b) { return b.date && b.start; })) return;
       // A column headed with "time" beats one that merely mentions a time
@@ -80,7 +83,11 @@ var UFRA_ROW = (function (CSV, M, B) {
       }
     });
 
-    var req = requested ? requested.read.bookings : [];
+    // The request says when, never where: the room comes from Finalized
+    // Information or the room preference column.
+    var req = requested ? requested.read.bookings.map(function (b) {
+      return { date: b.date, start: b.start, end: b.end, place: '', guessed: b.guessed };
+    }) : [];
     var fin = finalized ? B.parse(finalized.value, req.length ? refOf(req[0].date) : null)
                         : { bookings: [], cancelled: false };
     if (fin.cancelled) return { source: finalized.label, cancelled: true, sessions: [] };
@@ -94,7 +101,7 @@ var UFRA_ROW = (function (CSV, M, B) {
         date: f.date || r.date || null,
         start: f.start || r.start || null,
         end: f.start ? f.end : (r.end || null),
-        place: f.place || r.place || '',
+        place: f.place || '',
         guessed: f.guessed
       };
     }

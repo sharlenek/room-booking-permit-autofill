@@ -16,9 +16,50 @@ var UFRA_FILL = (function (S, M, A, F) {
     return (node.innerText || node.textContent || '').replace(/\s+/g, ' ').trim();
   }
 
+  /* A radio button's own label is its option ("Yes"); the question is the
+     text around the whole group: just before it, or inside it once the
+     options' own labels are taken out. */
+  function radioGroupPrompt(el) {
+    var group = radiosNamed(el.ownerDocument, el.name || '');
+    if (group.length < 2) return '';
+    var box = group[0].parentElement;
+    while (box && !group.every(function (r) { return box.contains(r); })) box = box.parentElement;
+    if (!box) return '';
+    var own = textOf(box);
+    group.forEach(function (r) {
+      var l = r.closest('label') || (r.id && r.ownerDocument.querySelector('label[for="' + cssEscape(r.id) + '"]'));
+      if (l) own = own.replace(textOf(l), ' ');
+    });
+    own = own.replace(/\s+/g, ' ').trim();
+    if (own) return own;
+    for (var n = box; n && n !== n.ownerDocument.body; n = n.parentElement) {
+      var prev = n.previousElementSibling;
+      if (prev && !prev.querySelector('input, select, textarea')) return textOf(prev);
+      if (prev) break;
+    }
+    return '';
+  }
+
+  /* Text that could be the question a control asks: its label candidates
+     without a radio option's own label or the name/id machinery. */
+  function promptsFor(el) {
+    var own = el.type === 'radio' ? optionLabel(el) : '';
+    var machinery = [humanize(el.getAttribute('name')), humanize(el.id)];
+    return labelCandidates(el).filter(function (t) {
+      return t !== own && machinery.indexOf(t) === -1 && !/^(yes|no)$/i.test(t);
+    });
+  }
+
+  function optionLabel(r) {
+    var l = r.closest('label') || (r.id && r.ownerDocument.querySelector('label[for="' + cssEscape(r.id) + '"]'));
+    return l ? textOf(l).replace(/\s+/g, ' ').trim() : '';
+  }
+
   function labelCandidates(el) {
     var out = [];
     var doc = el.ownerDocument;
+
+    if (el.type === 'radio') out.push(radioGroupPrompt(el));
 
     var labelledBy = el.getAttribute('aria-labelledby');
     if (labelledBy) {
@@ -125,7 +166,7 @@ var UFRA_FILL = (function (S, M, A, F) {
         .map(function (o) { return o.text; });
     } else if (el.type === 'radio' && el.name) {
       texts = radiosNamed(el.ownerDocument, el.name).map(function (r) {
-        return textOf(r.closest('label')) || r.value;
+        return optionLabel(r) || r.value;
       });
     } else {
       return false;
@@ -281,7 +322,8 @@ var UFRA_FILL = (function (S, M, A, F) {
     var best = null;
     var bestScore = 0;
     group.forEach(function (r) {
-      var texts = labelCandidates(r).concat([r.value]);
+      // The option's own label, never the group's question.
+      var texts = [optionLabel(r), r.value];
       texts.forEach(function (t) {
         var s = M.scorePhrase(value, t);
         if (s > bestScore) { bestScore = s; best = r; }
@@ -290,7 +332,7 @@ var UFRA_FILL = (function (S, M, A, F) {
     if (!best || bestScore < M.UNCERTAIN) return null;
     best.checked = true;
     notify(best);
-    return { written: textOf(best.closest('label')) || best.value, exact: bestScore >= M.CONFIDENT, element: best };
+    return { written: optionLabel(best) || best.value, exact: bestScore >= M.CONFIDENT, element: best };
   }
 
   /* ---------- highlighting ---------- */
@@ -369,7 +411,14 @@ var UFRA_FILL = (function (S, M, A, F) {
     var candidates = labelCandidates(el);
     var match = null;
     var yesNo = isYesNo(el);
-    if (yesNo) match = A.answer(candidates, rules, fields);
+    if (yesNo) match = A.answer(promptsFor(el), rules, fields);
+    var standing = !!match;
+    if (el.type === 'checkbox') {
+      // A checkbox is judged by its own label only: GatorConnect puts the
+      // first option's text beside every other option.
+      match = A.checkbox(optionLabel(el), rules);
+      standing = !!match;
+    }
     for (var i = 0; i < candidates.length && !match; i++) {
       match = M.findValue(candidates[i], fields);
       // A Yes/No question only takes a yes or no from the sheet.
@@ -383,6 +432,8 @@ var UFRA_FILL = (function (S, M, A, F) {
       result = yesNo ? fillYesNoSelect(el, match.value) : fillSelect(el, match.value);
     } else if (el.type === 'checkbox') {
       result = fillCheckbox(el, match.value);
+      // A standing answer is a decision, not a loose match.
+      if (result && standing) result.exact = true;
     } else if (el.type === 'radio') {
       result = fillRadioGroup(el, match.value);
       if (result && result.element) el = result.element;

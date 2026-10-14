@@ -60,3 +60,19 @@ button.secondary { background: var(--bg); color: var(--ink); border-color: var(-
 table { width: 100%; border-collapse: collapse; font-size: 12px; }
 th, td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
 th { color: var(--muted); font-weight: 600; }
+
+/* A <details> header that is one big target, not just its little arrow. */
+summary.disclosure {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 9px 10px; margin: 0 -10px; border-radius: 6px;
+  cursor: pointer; list-style: none; user-select: none;
+}
+summary.disclosure::-webkit-details-marker { display: none; }
+summary.disclosure::after {
+  content: ''; flex: none; width: 7px; height: 7px; margin-right: 3px;
+  border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg); transition: transform .15s;
+}
+details[open] > summary.disclosure::after { transform: rotate(45deg); }
+summary.disclosure:hover { background: var(--soft); }
+summary.disclosure:focus-visible { outline: 2px solid var(--uf-blue); outline-offset: -2px; }

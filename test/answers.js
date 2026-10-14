@@ -48,7 +48,7 @@ const html = '<form>' +
   '<select id="ackOnly"><option value="0"></option><option value="1">Yes, I understand</option></select></div>' +
   '</form>';
 
-const dom = new JSDOM(html, { pretendToBeVisual: true, url: 'https://rooms.ufl.edu/EmsWebApp/BrowseForSpace.aspx' });
+const dom = new JSDOM(html, { pretendToBeVisual: true, url: 'https://ufl.emscloudservice.com/web/ReservationDetails.aspx' });
 Object.assign(global, { window: dom.window, document: dom.window.document, location: dom.window.location,
   getComputedStyle: dom.window.getComputedStyle, Event: dom.window.Event, CSS: dom.window.CSS });
 dom.window.Element.prototype.getClientRects = function () { return [{ width: 10, height: 10 }]; };

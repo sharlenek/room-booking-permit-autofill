@@ -26,7 +26,7 @@ _Avoid_: label, question, field name
 
 **Form**:
 Which website the page belongs to, detected from its address: an EMS
-room request (rooms.ufl.edu) or a GatorConnect event. Standing answers and
+room request (ufl.emscloudservice.com) or a GatorConnect event. Standing answers and
 form-specific steps are scoped by Form. There is no toggle.
 _Avoid_: mode, site, template
 
@@ -65,7 +65,9 @@ The hand-written Column recording what was actually booked: dates, times and
 rooms, one Booking per line or spread over several. It wins over the
 requested date and time for whatever it states; anything it leaves out is
 borrowed from the request. "<-" means the same as requested; "holiday" or
-"cancelled" drop a Booking.
+"cancelled" drop a Booking. The extension can write it, one Booking per line
+("10/06/2026, 6:00pm - 8:00pm, Leigh Hall 0207"), from an EMS reservation
+page or an .ics file.
 _Avoid_: confirmed info, final booking
 
 **Standing answer**:

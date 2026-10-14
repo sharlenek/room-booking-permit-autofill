@@ -30,6 +30,22 @@
   </p>
   <div id="report" class="report" hidden></div>
 
+  <details id="finalize" class="report">
+    <summary class="disclosure"><span><b>Finalized Information</b>
+      <span class="small muted">from this reservation</span></span></summary>
+    <p class="small muted" style="margin:8px 0">On an EMS reservation page, read what was booked
+      and copy it into your sheet's Finalized Information cell.
+      Or <a href="#" class="toIcs">convert an .ics file</a>.</p>
+    <div class="row">
+      <button id="readBookings" class="secondary">Read bookings from this page</button>
+    </div>
+    <textarea id="finalizedOut" readonly hidden style="min-height:90px;margin-top:8px"></textarea>
+    <div class="row" style="margin-top:6px">
+      <button id="copyFinalized" class="secondary" hidden>Copy</button>
+      <span id="finalizedNote" class="small muted"></span>
+    </div>
+  </details>
+
   <p class="small muted" style="margin:14px 0 0">
     <a href="#" id="toOptions2">Settings &amp; organization details</a>
     <span id="stamp"></span>
@@ -43,5 +59,6 @@
 <script src="src/forms.js"></script>
 <script src="src/bookings.js"></script>
 <script src="src/row.js"></script>
+<script src="src/finalize.js"></script>
 <script src="src/datafiles.js"></script>
 <script src="popup.js"></script>

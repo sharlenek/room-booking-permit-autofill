@@ -136,5 +136,22 @@ $('erase').addEventListener('click', async () => {
   renderPreview([], [], {});
 });
 
+$('icsFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const bookings = UFRA_FINALIZE.fromIcs(await file.text());
+  const { buildingsText } = await UFRA_DATAFILES.load();
+  const buildings = buildingsText ? UFRA_FINALIZE.buildingsFrom(UFRA_CSV.parse(buildingsText)) : [];
+  $('icsOut').value = UFRA_FINALIZE.format(bookings, buildings);
+  $('icsNote').textContent = bookings.length
+    ? `${bookings.length} booking(s) from ${file.name}.`
+    : `No bookings found in ${file.name}.`;
+});
+
+$('copyIcs').addEventListener('click', async () => {
+  await navigator.clipboard.writeText($('icsOut').value);
+  $('icsNote').textContent = 'Copied — paste it into the Finalized Information cell.';
+});
+
 hookFile('orgFile', 'orgCsv');
 restore();
