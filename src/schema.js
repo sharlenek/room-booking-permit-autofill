@@ -32,7 +32,7 @@ var UFRA_SCHEMA = (function () {
     teardownTime:   ['teardown time', 'tear down time', 'breakdown time', 'cleanup time'],
 
     attendance:     ['attendance', 'expected attendance', 'number of attendees', 'anticipated attendance', 'estimated attendance', 'headcount', 'number of people', 'group size', 'no of attendees', 'attendees'],
-    location:       ['location', 'event location', 'requested location', 'venue', 'space', 'facility', 'site'],
+    location:       ['location', 'event location', 'requested location', 'room preference', 'preferred room', 'preferred location', 'venue', 'space', 'facility', 'site'],
     building:       ['building', 'facility name', 'building name'],
     room:           ['room', 'room number', 'space requested', 'room requested'],
     rainLocation:   ['rain location', 'rain site', 'alternate location', 'backup location', 'inclement weather location'],

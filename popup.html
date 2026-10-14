@@ -7,30 +7,35 @@
   <h1>UF Reservation Autofill</h1>
 </header>
 <main>
-  <div id="empty" class="note small" hidden>
-    No event data imported yet. <a href="#" id="toOptions1">Import your sheet</a> to get started.
-  </div>
+  <div id="setup" class="note small" style="margin-bottom:14px" hidden></div>
 
-  <div id="ready" hidden>
-    <label class="field">
-      <span>Event</span>
-      <select id="event"></select>
-    </label>
-    <div class="row">
-      <button id="fill">Fill Form</button>
-      <button id="clear" class="secondary">Clear highlights</button>
-    </div>
-    <p class="small muted" style="margin:10px 0 0">
-      Only empty fields are filled. Nothing is ever submitted.
-    </p>
-    <div id="report" class="report" hidden></div>
+  <label class="field">
+    <span>Event row</span>
+    <textarea id="paste" rows="3" style="min-height:64px"
+      placeholder="Copy the event's row in Google Sheets (click its row number), then paste here"></textarea>
+  </label>
+  <label class="field" id="pickRow" hidden>
+    <span>Which row</span>
+    <select id="event"></select>
+  </label>
+  <p id="parsed" class="small muted" style="margin:-6px 0 12px"></p>
+
+  <div class="row">
+    <button id="fill" disabled>Fill Form</button>
+    <button id="clear" class="secondary">Clear highlights</button>
   </div>
+  <p class="small muted" style="margin:10px 0 0">
+    Only empty fields are filled. Nothing is ever submitted.
+  </p>
+  <div id="report" class="report" hidden></div>
 
   <p class="small muted" style="margin:14px 0 0">
-    <a href="#" id="toOptions2">Manage imported data</a>
+    <a href="#" id="toOptions2">Settings &amp; organization details</a>
     <span id="stamp"></span>
   </p>
 </main>
+<script src="src/csv.js"></script>
 <script src="src/schema.js"></script>
 <script src="src/matcher.js"></script>
+<script src="src/row.js"></script>
 <script src="popup.js"></script>

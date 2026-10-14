@@ -8,10 +8,16 @@ It **never submits a form.** It fills, flags anything uncertain, and leaves the 
 
 ## How it works
 
-1. Export your sheet from Google Sheets as CSV and import it on the extension's options page.
-   Each column header is mapped to a canonical field (`eventName`, `attendance`, `advisorEmail`, …)
-   using a synonym vocabulary covering the wordings both UF forms use.
-2. Open a reservation or permit form, click the extension, pick an event, press **Fill Form**.
+1. Once, on the extension's options page: paste your organization details, and paste the
+   **header row** of your events sheet (click row 1's number in Google Sheets, copy). Each
+   column is mapped to a canonical field (`eventName`, `attendance`, `advisorEmail`, …) using
+   a synonym vocabulary covering the wordings both UF forms use. Tracking columns
+   (*submitted*, *approved*, *notes*, *price*, *paid?*, *priority*) and a bare *Name* start
+   switched off so they never reach a form; tick or untick any column there.
+2. Each time: copy the event's row in Google Sheets, open the reservation or permit form,
+   click the extension, paste the row, press **Fill Form**. The pasted row is remembered, so
+   it is still there on the next page of the EMS wizard. Paste several rows to pick between
+   them, or paste the header row together with the event row if you skipped step 1.
 3. The content script reads every visible, enabled, empty control on the page, works out its
    label, and scores that label against your imported columns.
 
@@ -45,12 +51,16 @@ Faculty Advisor,Dr. Elena Reyes
 Faculty Advisor Email,reyes@ufl.edu
 ```
 
-**Events** — one header row, one row per event:
+**Events** — your events sheet as-is. A header row, one row per event:
 
-```csv
-Event Name,Date,Start Time,End Time,Expected Attendance,Location,Event Type,Description
-Grove Day Social,9/12/2026,3:00 PM,5:00 PM,75,Reitz Union 2365,Social Event,Annual member social
 ```
+Event name	Estimated attendance	Reservation date and time (e.g. 09/16/2024, 6:00pm - 8:00pm)	Room preference	Preferred room setup
+Grove Day Social	75	09/12/2026, 3:00pm - 5:00pm	Reitz Union 2365	Banquet
+```
+
+A cell like `09/12/2026, 3:00pm - 5:00pm` is split into a date, a start time and an end time.
+If a separate *Reservation Date* column disagrees with it, date fields are filled but outlined
+for review.
 
 Column names are flexible — *Anticipated Attendance*, *Date of Event*, *E-mail Address* all
 resolve. Unrecognised columns still work if a form label matches the column name directly.
@@ -76,15 +86,17 @@ you click Fill Form, and imported data stays in local storage on your machine.
 npm i --no-save jsdom
 node test/run.js     # end-to-end fill against a mock EMS-style form
 node test/edge.js    # labels that must not be confidently autofilled
+node test/paste.js   # a row copied from the events sheet
 ```
 
 ## Layout
 
 | File | Role |
 | --- | --- |
-| [src/csv.js](src/csv.js) | RFC-4180 CSV parser; detects key/value vs header+row sheets |
+| [src/csv.js](src/csv.js) | RFC-4180 parser for CSV and copied (tab-separated) cells; detects key/value vs header+row sheets |
+| [src/row.js](src/row.js) | Pasted row → fields: header matching, tracking columns, date/time range splitting |
 | [src/schema.js](src/schema.js) | Canonical fields, synonyms, qualifier words, normalisation |
 | [src/matcher.js](src/matcher.js) | Label scoring, header→field mapping, confidence + ambiguity |
 | [src/fill.js](src/fill.js) | Content script: label discovery, value coercion, writing, highlighting |
-| [popup.js](popup.js) | Event picker, injection, fill report |
-| [options.js](options.js) | CSV import and recognised-column preview |
+| [popup.js](popup.js) | Row paste box, injection, fill report |
+| [options.js](options.js) | Org details, header row, per-column on/off |

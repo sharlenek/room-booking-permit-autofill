@@ -1,7 +1,8 @@
-/* Minimal RFC-4180 CSV parser. Handles quoted fields, embedded commas,
+/* Minimal RFC-4180 parser for CSV files and for the tab-separated text Google
+   Sheets puts on the clipboard. Handles quoted fields, embedded delimiters,
    newlines and doubled quotes. Returns an array of string arrays. */
 var UFRA_CSV = (function () {
-  function parse(text) {
+  function parse(text, delim) {
     var rows = [];
     var row = [];
     var field = '';
@@ -10,6 +11,8 @@ var UFRA_CSV = (function () {
 
     // Strip a UTF-8 BOM and normalise line endings.
     text = String(text || '').replace(/^﻿/, '').replace(/\r\n?/g, '\n');
+    // Text copied out of a spreadsheet is tab-separated.
+    if (!delim) delim = text.indexOf('\t') !== -1 ? '\t' : ',';
 
     while (i < text.length) {
       var c = text[i];
@@ -22,8 +25,10 @@ var UFRA_CSV = (function () {
         field += c; i++; continue;
       }
 
-      if (c === '"') { inQuotes = true; i++; continue; }
-      if (c === ',') { row.push(field); field = ''; i++; continue; }
+      // Only a quote that opens a field starts quoting; elsewhere it is
+      // literal, as in an unquoted 5" table leg.
+      if (c === '"' && field === '') { inQuotes = true; i++; continue; }
+      if (c === delim) { row.push(field); field = ''; i++; continue; }
       if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
       field += c; i++;
     }

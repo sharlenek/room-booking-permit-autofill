@@ -8,15 +8,16 @@
 </header>
 <main>
   <p class="note small">
-    In Google Sheets choose <b>File › Download › Comma-separated values</b>, then paste the
-    contents below or pick the downloaded file. Data stays on this computer.
+    Set this up once. After that, copy an event row from your sheet and paste it into the
+    extension popup on the reservation page. Data stays on this computer.
   </p>
 
   <div class="cols" style="margin-top:16px">
     <section>
       <h2>Organization details</h2>
       <p class="small muted">Permanent info reused on every form. Either two columns
-        (<code>Field,Value</code> per row) or a header row plus one data row.</p>
+        (<code>Field,Value</code> per row) or a header row plus one data row. In Google Sheets,
+        <b>File › Download › Comma-separated values</b>, or copy the cells and paste them here.</p>
       <label class="field">
         <input type="file" id="orgFile" accept=".csv,text/csv">
       </label>
@@ -24,17 +25,15 @@
     </section>
 
     <section>
-      <h2>Events</h2>
-      <p class="small muted">One header row, then one row per event.</p>
-      <label class="field">
-        <input type="file" id="eventsFile" accept=".csv,text/csv">
-      </label>
-      <textarea id="eventsCsv" placeholder="Event Name,Date,Start Time,End Time,Expected Attendance,Location,Description&#10;Grove Day,9/12/2026,3:00 PM,5:00 PM,75,Reitz Union 2365,Annual member social"></textarea>
+      <h2>Events sheet header row</h2>
+      <p class="small muted">Click row 1 of your events sheet (the row number on the left),
+        copy it, and paste it here. Event rows you paste later are read against these columns.</p>
+      <textarea id="headerRow" placeholder="Paste your sheet's header row"></textarea>
     </section>
   </div>
 
   <div class="row" style="margin-top:8px">
-    <button id="save">Import</button>
+    <button id="save">Save</button>
     <button id="erase" class="secondary">Erase all data</button>
     <span id="status" class="small muted"></span>
   </div>
@@ -44,4 +43,5 @@
 <script src="src/csv.js"></script>
 <script src="src/schema.js"></script>
 <script src="src/matcher.js"></script>
+<script src="src/row.js"></script>
 <script src="options.js"></script>

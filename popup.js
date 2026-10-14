@@ -1,42 +1,77 @@
 const $ = (id) => document.getElementById(id);
 
-function eventTitle(ev, i) {
-  const named = ev.fields.find((f) => f.canon === 'eventName' && f.value);
-  const dated = ev.fields.find((f) => f.canon === 'eventDate' && f.value);
-  const base = named ? named.value : (ev.fields.find((f) => f.value)?.value || `Event ${i + 1}`);
+function eventTitle(fields, i) {
+  const named = fields.find((f) => f.canon === 'eventName' && f.value);
+  const dated = fields.find((f) => f.canon === 'eventDate' && f.value);
+  const base = named ? named.value : (fields.find((f) => f.value)?.value || `Row ${i + 1}`);
   return dated ? `${base} — ${dated.value}` : base;
 }
 
-async function load() {
-  const { org = [], events = [], importedAt, selectedIndex = 0 } =
-    await chrome.storage.local.get(['org', 'events', 'importedAt', 'selectedIndex']);
+let state = { org: [], headers: [], columnUse: {}, rows: [] };
 
-  if (!events.length && !org.length) {
-    $('empty').hidden = false;
-    return { org, events };
+function showSetup() {
+  const missing = [];
+  if (!state.headers.length) {
+    missing.push('save your sheet’s header row once, so you only need to paste the event row ' +
+      '(until then, copy the header row together with it)');
   }
+  if (!state.org.length) missing.push('add your organization details (name, email, phone, advisor)');
+  $('setup').hidden = !missing.length;
+  $('setup').innerHTML = missing.length
+    ? `<a href="#" class="toOptions">Settings</a>: ${missing.map(escapeHtml).join('; and ')}.`
+    : '';
+}
 
-  $('ready').hidden = false;
+/* Re-read the paste box into rows of fields, and show what was understood. */
+function readPaste(selectedIndex) {
+  const text = $('paste').value;
   const select = $('event');
-  if (events.length) {
-    events.forEach((ev, i) => {
-      const opt = document.createElement('option');
-      opt.value = String(i);
-      opt.textContent = eventTitle(ev, i);
-      select.appendChild(opt);
-    });
-    select.value = String(Math.min(selectedIndex, events.length - 1));
-  } else {
-    const opt = document.createElement('option');
-    opt.textContent = 'Organization details only';
-    select.appendChild(opt);
-    select.disabled = true;
+  select.innerHTML = '';
+  $('pickRow').hidden = true;
+  state.rows = [];
+
+  if (!text.trim()) {
+    $('parsed').textContent = '';
+    $('fill').disabled = !state.org.length;
+    return;
   }
 
-  if (importedAt) {
-    $('stamp').textContent = ` · imported ${new Date(importedAt).toLocaleDateString()}`;
+  const read = UFRA_ROW.readPaste(text, state.headers);
+  if (read.error) {
+    $('parsed').textContent = read.error;
+    $('fill').disabled = true;
+    return;
   }
-  return { org, events };
+
+  state.rows = read.rows.map((r) => UFRA_ROW.toFields(read.headers, r, state.columnUse));
+  state.rows.forEach((fields, i) => {
+    const opt = document.createElement('option');
+    opt.value = String(i);
+    opt.textContent = eventTitle(fields, i);
+    select.appendChild(opt);
+  });
+  select.value = String(Math.min(selectedIndex || 0, state.rows.length - 1));
+  $('pickRow').hidden = state.rows.length < 2;
+  updateParsed();
+  $('fill').disabled = false;
+}
+
+function updateParsed() {
+  const i = Number($('event').value) || 0;
+  const fields = state.rows[i] || [];
+  $('parsed').textContent = `${eventTitle(fields, i)} · ${fields.length} value(s) to use`;
+}
+
+async function load() {
+  const { org = [], headers = [], columnUse = {}, pasted = '', selectedIndex = 0, importedAt } =
+    await chrome.storage.local.get(['org', 'headers', 'columnUse', 'pasted', 'selectedIndex', 'importedAt']);
+  state = { org, headers, columnUse, rows: [] };
+  showSetup();
+  $('paste').value = pasted;
+  readPaste(selectedIndex);
+  if (importedAt) {
+    $('stamp').textContent = ` · saved ${new Date(importedAt).toLocaleDateString()}`;
+  }
 }
 
 function renderReport(report) {
@@ -92,10 +127,18 @@ function mergeReports(results) {
 }
 
 async function main() {
-  const { org, events } = await load();
+  await load();
+
+  // The popup closes whenever the page is clicked, so keep the paste around
+  // for the next step of the reservation wizard.
+  $('paste').addEventListener('input', () => {
+    chrome.storage.local.set({ pasted: $('paste').value, selectedIndex: 0 });
+    readPaste(0);
+  });
 
   $('event').addEventListener('change', (e) => {
     chrome.storage.local.set({ selectedIndex: Number(e.target.value) });
+    updateParsed();
   });
 
   $('fill').addEventListener('click', async () => {
@@ -107,7 +150,7 @@ async function main() {
       await injectInto(tab.id);
       const idx = Number($('event').value) || 0;
       // Event details take precedence over organization defaults on a tie.
-      const fields = [...(events[idx]?.fields || []), ...org];
+      const fields = [...(state.rows[idx] || []), ...state.org];
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: true },
         func: (f) => UFRA_FILL.run(f),
@@ -133,12 +176,11 @@ async function main() {
     });
   });
 
-  for (const id of ['toOptions1', 'toOptions2']) {
-    $(id)?.addEventListener('click', (e) => {
-      e.preventDefault();
-      chrome.runtime.openOptionsPage();
-    });
-  }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#toOptions2, .toOptions')) return;
+    e.preventDefault();
+    chrome.runtime.openOptionsPage();
+  });
 }
 
 main();

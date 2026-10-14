@@ -13,27 +13,50 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
-function renderPreview(org, events) {
-  const box = $('preview');
-  if (!org.length && !events.length) { box.innerHTML = ''; return; }
+function canonCell(label) {
+  const hit = UFRA_MATCH.headerToCanon(label);
+  return hit
+    ? `<span class="pill">${escapeHtml(hit.canon)}</span>`
+    : '<span class="muted">matched by column name only</span>';
+}
 
-  const columns = [...org, ...(events[0]?.fields || [])];
+function renderPreview(org, headers, columnUse) {
+  const box = $('preview');
+  const named = headers.filter((h) => h.trim());
+  if (!org.length && !named.length) { box.innerHTML = ''; return; }
+
+  const orgRows = org.map((f) => `<tr>
+      <td></td><td>${escapeHtml(f.label)}</td><td>${canonCell(f.label)}</td></tr>`).join('');
+
   const seen = new Set();
-  const rows = columns
-    .filter((f) => !seen.has(f.label) && seen.add(f.label))
-    .map((f) => `<tr>
-        <td>${escapeHtml(f.label)}</td>
-        <td>${f.canon
-            ? `<span class="pill">${escapeHtml(f.canon)}</span>`
-            : '<span class="muted">matched by column name only</span>'}</td>
-      </tr>`)
-    .join('');
+  const eventRows = named
+    .filter((h) => !seen.has(h) && seen.add(h))
+    .map((h, i) => `<tr>
+      <td><input type="checkbox" data-header="${escapeHtml(h)}" id="use${i}"
+        ${UFRA_ROW.isUsed(h, columnUse) ? 'checked' : ''}></td>
+      <td><label for="use${i}">${escapeHtml(h)}</label></td>
+      <td>${canonCell(h)}</td></tr>`).join('');
 
   box.innerHTML = `
-    <h2>Recognised columns</h2>
-    <p class="small muted">${org.length} organization field(s), ${events.length} event(s).
-      Columns without a recognised field still match if a form label matches the column name.</p>
-    <table><thead><tr><th>Your column</th><th>Recognised as</th></tr></thead><tbody>${rows}</tbody></table>`;
+    ${named.length ? `
+      <h2>Events sheet columns</h2>
+      <p class="small muted">Unticked columns are never put into a form. Tracking columns
+        (submitted, approved, notes, price, …) start unticked. A value like
+        <code>09/16/2024, 6:00pm - 8:00pm</code> is split into date, start time and end time.</p>
+      <table><thead><tr><th>Use</th><th>Your column</th><th>Recognised as</th></tr></thead>
+        <tbody>${eventRows}</tbody></table>` : ''}
+    ${org.length ? `
+      <h2 style="margin-top:22px">Organization details</h2>
+      <table><thead><tr><th></th><th>Your field</th><th>Recognised as</th></tr></thead>
+        <tbody>${orgRows}</tbody></table>` : ''}`;
+
+  box.querySelectorAll('input[data-header]').forEach((cb) => {
+    cb.addEventListener('change', async () => {
+      const { columnUse = {} } = await chrome.storage.local.get('columnUse');
+      columnUse[cb.dataset.header] = cb.checked;
+      await chrome.storage.local.set({ columnUse });
+    });
+  });
 }
 
 function hookFile(inputId, textareaId) {
@@ -44,51 +67,50 @@ function hookFile(inputId, textareaId) {
 }
 
 async function restore() {
-  const { org = [], events = [], rawOrgCsv = '', rawEventsCsv = '', importedAt } =
-    await chrome.storage.local.get(['org', 'events', 'rawOrgCsv', 'rawEventsCsv', 'importedAt']);
+  const { org = [], headers = [], rawOrgCsv = '', rawHeaders = '', columnUse = {}, importedAt } =
+    await chrome.storage.local.get(['org', 'headers', 'rawOrgCsv', 'rawHeaders', 'columnUse', 'importedAt']);
   $('orgCsv').value = rawOrgCsv;
-  $('eventsCsv').value = rawEventsCsv;
-  if (importedAt) $('status').textContent = `Last imported ${new Date(importedAt).toLocaleString()}`;
-  renderPreview(org, events);
+  $('headerRow').value = rawHeaders;
+  if (importedAt) $('status').textContent = `Last saved ${new Date(importedAt).toLocaleString()}`;
+  renderPreview(org, headers, columnUse);
 }
 
 $('save').addEventListener('click', async () => {
   const rawOrgCsv = $('orgCsv').value.trim();
-  const rawEventsCsv = $('eventsCsv').value.trim();
+  const rawHeaders = $('headerRow').value.trim();
 
   let org = [];
-  let events = [];
+  let headers = [];
   try {
     if (rawOrgCsv) org = annotate(UFRA_CSV.parseRecord(rawOrgCsv));
-    if (rawEventsCsv) {
-      events = UFRA_CSV.parseTable(rawEventsCsv).records
-        .map((fields) => ({ fields: annotate(fields) }));
-    }
+    // Only the first row counts, in case a data row came along with it.
+    if (rawHeaders) headers = UFRA_CSV.parse(rawHeaders)[0] || [];
   } catch (err) {
-    $('status').textContent = `Could not read that CSV: ${err.message}`;
+    $('status').textContent = `Could not read that: ${err.message}`;
     return;
   }
 
-  if (!org.length && !events.length) {
-    $('status').textContent = 'Nothing to import — both boxes are empty.';
+  if (!org.length && !headers.length) {
+    $('status').textContent = 'Nothing to save — both boxes are empty.';
     return;
   }
 
   const importedAt = new Date().toISOString();
-  await chrome.storage.local.set({ org, events, rawOrgCsv, rawEventsCsv, importedAt, selectedIndex: 0 });
-  $('status').textContent = `Imported ${events.length} event(s) and ${org.length} organization field(s).`;
-  renderPreview(org, events);
+  const { columnUse = {} } = await chrome.storage.local.get('columnUse');
+  await chrome.storage.local.set({ org, headers, rawOrgCsv, rawHeaders, importedAt });
+  const columns = headers.filter((h) => h.trim()).length;
+  $('status').textContent = `Saved ${org.length} organization field(s) and ${columns} sheet column(s).`;
+  renderPreview(org, headers, columnUse);
 });
 
 $('erase').addEventListener('click', async () => {
-  if (!confirm('Erase all imported organization and event data?')) return;
+  if (!confirm('Erase all saved organization details, sheet columns and pasted rows?')) return;
   await chrome.storage.local.clear();
   $('orgCsv').value = '';
-  $('eventsCsv').value = '';
+  $('headerRow').value = '';
   $('status').textContent = 'All data erased.';
-  renderPreview([], []);
+  renderPreview([], [], {});
 });
 
 hookFile('orgFile', 'orgCsv');
-hookFile('eventsFile', 'eventsCsv');
 restore();
