@@ -113,10 +113,68 @@ var UFRA_MATCH = (function (S) {
     return bestScore >= UNCERTAIN ? { canon: best, score: bestScore } : null;
   }
 
+  /* One person whose details a form may ask for together in a single box. */
+  var PEOPLE = [
+    { role: /\b(?:faculty\s+)?advis[eo]r\b/, qualifier: ['advisor', 'adviser', 'faculty'],
+      parts: { name: 'advisorName', email: 'advisorEmail', phone: 'advisorPhone' } },
+    { role: /\b(?:contact|requester)\b/, qualifier: [],
+      parts: { name: 'contactName', email: 'contactEmail', phone: 'contactPhone' } }
+  ];
+
+  /* "Faculty advisor, email and phone number" wants all three in one box.
+     Read the raw prompt, since normalising drops "(name, email, phone)". */
+  function compoundValue(pageLabel, fields) {
+    var raw = String(pageLabel).toLowerCase();
+    var asks = {
+      email: /e-?mail/.test(raw),
+      phone: /phone|cell|telephone/.test(raw),
+      // The role on its own ("Faculty advisor, email ...") names the person;
+      // "Faculty advisor email and phone" does not.
+      name: false
+    };
+
+    for (var i = 0; i < PEOPLE.length; i++) {
+      var p = PEOPLE[i];
+      var role = raw.match(p.role);
+      if (!role) continue;
+
+      // "Emergency contact name and phone" is someone else entirely.
+      var foreign = S.qualifiersIn(pageLabel).filter(function (q) {
+        return p.qualifier.indexOf(q) === -1;
+      });
+      if (foreign.length) continue;
+
+      var after = raw.slice(role.index + role[0].length);
+      asks.name = /\bname\b/.test(raw) || !/^\s*(e-?mail|phone|cell|telephone)/.test(after);
+
+      var wanted = ['name', 'email', 'phone'].filter(function (k) { return asks[k]; });
+      if (wanted.length < 2) return null;
+
+      var found = [];
+      wanted.forEach(function (k) {
+        var f = fields.find(function (f) { return f.canon === p.parts[k] && f.value; });
+        if (f) found.push(f);
+      });
+      if (found.length < 2) return null;
+
+      return {
+        value: found.map(function (f) { return f.value; }).join(', '),
+        label: found.map(function (f) { return f.label; }).join(' + '),
+        score: 1,
+        confidence: found.length === wanted.length ? 'confident' : 'uncertain',
+        alternative: null
+      };
+    }
+    return null;
+  }
+
   /* Pick a value for one page field.
      Returns null, or {value, label, score, confidence}. */
   function findValue(pageLabel, fields) {
     if (!pageLabel) return null;
+
+    var compound = compoundValue(pageLabel, fields);
+    if (compound) return compound;
 
     var scored = fields
       .filter(function (f) { return f.value !== '' && f.value != null; })

@@ -67,15 +67,39 @@ function hookFile(inputId, textareaId) {
 }
 
 async function restore() {
-  const { org = [], headers = [], rawOrgCsv = '', rawHeaders = '', columnUse = {}, importedAt } =
+  let { org = [], headers = [], rawOrgCsv = '', rawHeaders = '', columnUse = {}, importedAt } =
     await chrome.storage.local.get(['org', 'headers', 'rawOrgCsv', 'rawHeaders', 'columnUse', 'importedAt']);
   $('orgCsv').value = rawOrgCsv;
   $('headerRow').value = rawHeaders;
   if (importedAt) $('status').textContent = `Last saved ${new Date(importedAt).toLocaleString()}`;
+
+  // A file in data/ wins over whatever was saved here.
+  const files = await UFRA_DATAFILES.load();
+  if (files.orgText) {
+    org = annotate(UFRA_CSV.parseRecord(files.orgText));
+    lockToFile('orgCsv', files.orgText, 'data/org.csv');
+  }
+  if (files.headerText) {
+    headers = UFRA_CSV.parse(files.headerText)[0] || [];
+    lockToFile('headerRow', files.headerText, 'data/sheet-header.txt');
+  }
   renderPreview(org, headers, columnUse);
 }
 
+function lockToFile(textareaId, text, path) {
+  const box = $(textareaId);
+  box.value = text;
+  box.readOnly = true;
+  const note = document.createElement('p');
+  note.className = 'small muted';
+  note.innerHTML = `Read from <code>${path}</code> in the extension folder. Edit that file to change it.`;
+  box.after(note);
+  box.closest('section').querySelector('input[type="file"]')?.closest('label').remove();
+}
+
 $('save').addEventListener('click', async () => {
+  // A box read from a data/ file still saves, so its copy here is a fallback
+  // if the file is ever removed; while the file exists it wins on load.
   const rawOrgCsv = $('orgCsv').value.trim();
   const rawHeaders = $('headerRow').value.trim();
 

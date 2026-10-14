@@ -40,7 +40,8 @@ blank rather than confidently wrong — which is the failure mode that matters o
 
 ## Sheet format
 
-**Organization details** — permanent info, either two columns or a header row plus one data row:
+**Organization details** — permanent info. Keep it in `data/org.csv` (gitignored; copy
+`data/org.example.csv`), or paste it on the settings page. Either two columns or a header row plus one data row:
 
 ```csv
 Field,Value
@@ -87,6 +88,7 @@ npm i --no-save jsdom
 node test/run.js     # end-to-end fill against a mock EMS-style form
 node test/edge.js    # labels that must not be confidently autofilled
 node test/paste.js   # a row copied from the events sheet
+node test/compound.js # "advisor, email and phone" in one box
 ```
 
 ## Layout

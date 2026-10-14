@@ -7,6 +7,13 @@ function eventTitle(fields, i) {
   return dated ? `${base} — ${dated.value}` : base;
 }
 
+function annotate(fields) {
+  return fields.map((f) => {
+    const hit = UFRA_MATCH.headerToCanon(f.label);
+    return { label: f.label, value: f.value, canon: hit ? hit.canon : null };
+  });
+}
+
 let state = { org: [], headers: [], columnUse: {}, rows: [] };
 
 function showSetup() {
@@ -66,6 +73,10 @@ async function load() {
   const { org = [], headers = [], columnUse = {}, pasted = '', selectedIndex = 0, importedAt } =
     await chrome.storage.local.get(['org', 'headers', 'columnUse', 'pasted', 'selectedIndex', 'importedAt']);
   state = { org, headers, columnUse, rows: [] };
+
+  const files = await UFRA_DATAFILES.load();
+  if (files.orgText) state.org = annotate(UFRA_CSV.parseRecord(files.orgText));
+  if (files.headerText) state.headers = UFRA_CSV.parse(files.headerText)[0] || [];
   showSetup();
   $('paste').value = pasted;
   readPaste(selectedIndex);
