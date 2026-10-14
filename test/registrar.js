@@ -57,5 +57,5 @@ function show(label) {
 
 console.log('=== controls EMS left empty ===');
 EMPTY.forEach(show);
-console.log('\n=== acknowledgements (must not be auto-answered) ===');
+console.log('\n=== acknowledgements (never answered from sheet data; see test/answers.js) ===');
 ACKNOWLEDGEMENTS.forEach(show);

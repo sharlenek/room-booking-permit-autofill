@@ -7,6 +7,9 @@ var UFRA_MATCH = (function (S) {
 
   /* How well one page label matches one candidate phrase, 0..1. */
   function scorePhrase(label, phrase) {
+    if (String(phrase).charAt(0) === '=') {
+      return S.normalize(label) === S.normalize(phrase.slice(1)) ? 1 : 0;
+    }
     var ln = S.normalize(label);
     var pn = S.normalize(phrase);
     if (!ln || !pn) return 0;
@@ -20,6 +23,10 @@ var UFRA_MATCH = (function (S) {
       // form wording and should still read as a confident match.
       var extra = S.tokens(ln).length - S.tokens(pn).length;
       score = 0.92 - Math.min(0.3, Math.max(0, extra) * 0.05);
+      // A whole multi-word phrase, in order, is better evidence than the
+      // same number of words scattered through the prompt (0.78 below), so
+      // "the full organization name" is Organization Name, not "full name".
+      if (S.tokens(pn).length > 1) score = Math.max(score, 0.8);
     } else {
       // EMS writes prompts as whole sentences ("Indicate how many people you
       // expect to attend"), so the synonym's words are present but scattered

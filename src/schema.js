@@ -2,8 +2,11 @@
    EMS Cloud reservation forms and the UF event permit form. */
 var UFRA_SCHEMA = (function () {
 
+  // A synonym starting with "=" matches only a label that is exactly it.
+  // EMS's "Groups" menu is the requesting organization, but "Group Email"
+  // and "Group Size" are not.
   var FIELDS = {
-    orgName:        ['organization name', 'organization', 'student organization', 'group name', 'department or organization', 'requesting organization', 'sponsoring organization', 'org name', 'club name'],
+    orgName:        ['organization name', 'organization', 'student organization', 'group name', '=groups', 'department or organization', 'requesting organization', 'sponsoring organization', 'org name', 'club name'],
     orgAcronym:     ['organization acronym', 'acronym', 'abbreviation', 'short name'],
     orgEmail:       ['organization email', 'group email', 'org email'],
     orgPhone:       ['organization phone', 'group phone', 'org phone'],
@@ -11,7 +14,7 @@ var UFRA_SCHEMA = (function () {
     orgAddress:     ['organization address', 'mailing address', 'street address', 'address'],
     department:     ['department', 'college', 'unit', 'academic department'],
 
-    contactName:    ['contact name', 'requester name', 'your name', 'full name', 'name of requester', 'primary contact', 'event contact', 'requested by', 'submitted by'],
+    contactName:    ['contact name', '=1st contact', 'requester name', 'your name', 'full name', 'name of requester', 'primary contact', 'event contact', 'requested by', 'submitted by'],
     contactEmail:   ['contact email', 'requester email', 'your email', 'email address', 'email', 'e-mail'],
     contactPhone:   ['contact phone', 'requester phone', 'your phone', 'phone number', 'phone', 'telephone', 'cell', 'mobile'],
     contactTitle:   ['contact title', 'position', 'role', 'title in organization'],
@@ -78,6 +81,9 @@ var UFRA_SCHEMA = (function () {
       .toLowerCase()
       .replace(/[‘’]/g, "'")
       .replace(/\(.*?\)/g, ' ')       // parenthetical hints
+      // EMS appends instructions after an asterisk: "Event Name *Include
+      // Organization Name" names the event, not the organization.
+      .replace(/(\S)\s*\*\s*[a-z].*$/, '$1')
       .replace(/[^a-z0-9'\s]/g, ' ')  // punctuation, hyphens and required markers
       .replace(/\s+/g, ' ')
       .replace(/\be mail\b/g, 'email')

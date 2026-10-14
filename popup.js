@@ -14,7 +14,7 @@ function annotate(fields) {
   });
 }
 
-let state = { org: [], headers: [], columnUse: {}, rows: [] };
+let state = { org: [], headers: [], columnUse: {}, rows: [], answers: [] };
 
 function showSetup() {
   const missing = [];
@@ -50,8 +50,11 @@ function readPaste(selectedIndex) {
     return;
   }
 
-  state.rows = read.rows.map((r) => UFRA_ROW.toFields(read.headers, r, state.columnUse));
-  state.rows.forEach((fields, i) => {
+  state.rows = read.rows.map((r) => ({
+    fields: UFRA_ROW.toFields(read.headers, r, state.columnUse),
+    schedule: UFRA_ROW.schedule(read.headers, r)
+  }));
+  state.rows.forEach(({ fields }, i) => {
     const opt = document.createElement('option');
     opt.value = String(i);
     opt.textContent = eventTitle(fields, i);
@@ -65,18 +68,31 @@ function readPaste(selectedIndex) {
 
 function updateParsed() {
   const i = Number($('event').value) || 0;
-  const fields = state.rows[i] || [];
-  $('parsed').textContent = `${eventTitle(fields, i)} · ${fields.length} value(s) to use`;
+  const { fields = [], schedule } = state.rows[i] || {};
+  let when = '';
+  if (schedule && schedule.cancelled) when = ' · cancelled';
+  else if (schedule && schedule.sessions.length > 1) when = ` · ${schedule.sessions.length} dates`;
+  $('parsed').textContent = `${eventTitle(fields, i)} · ${fields.length} value(s) to use${when}`;
 }
 
 async function load() {
   const { org = [], headers = [], columnUse = {}, pasted = '', selectedIndex = 0, importedAt } =
     await chrome.storage.local.get(['org', 'headers', 'columnUse', 'pasted', 'selectedIndex', 'importedAt']);
-  state = { org, headers, columnUse, rows: [] };
+  state = { org, headers, columnUse, rows: [], answers: [] };
 
   const files = await UFRA_DATAFILES.load();
   if (files.orgText) state.org = annotate(UFRA_CSV.parseRecord(files.orgText));
   if (files.headerText) state.headers = UFRA_CSV.parse(files.headerText)[0] || [];
+  state.answers = files.answersText ? UFRA_ANSWERS.fromCsvRows(UFRA_CSV.parse(files.answersText)) : [];
+
+  // Which Form this tab is, so a wrong guess is visible before filling.
+  try {
+    const tab = await activeTab();
+    const form = UFRA_FORMS.detect(new URL(tab.url));
+    $('detected').textContent = form.id === 'other'
+      ? 'Not a recognised form — matching by field names only.'
+      : `Detected: ${form.name}`;
+  } catch (e) { /* no URL access: leave the line empty */ }
   showSetup();
   $('paste').value = pasted;
   readPaste(selectedIndex);
@@ -89,10 +105,10 @@ function renderReport(report) {
   const box = $('report');
   box.hidden = false;
   const rows = report.details
-    .filter((d) => d.status !== 'skipped')
+    .filter((d) => d.status !== 'skipped' || d.note)
     .map((d) => `<li><span class="dot ${d.status}"></span><span>
         ${escapeHtml(d.label)}
-        <span class="muted small">← ${escapeHtml(d.from || '')}</span>
+        <span class="muted small">${d.status === 'skipped' ? escapeHtml(d.note) : '← ' + escapeHtml(d.from || '')}</span>
       </span></li>`)
     .join('');
 
@@ -120,7 +136,7 @@ async function activeTab() {
 async function injectInto(tabId) {
   await chrome.scripting.executeScript({
     target: { tabId, allFrames: true },
-    files: ['src/schema.js', 'src/matcher.js', 'src/fill.js']
+    files: ['src/schema.js', 'src/matcher.js', 'src/answers.js', 'src/forms.js', 'src/fill.js']
   });
 }
 
@@ -161,11 +177,12 @@ async function main() {
       await injectInto(tab.id);
       const idx = Number($('event').value) || 0;
       // Event details take precedence over organization defaults on a tie.
-      const fields = [...(state.rows[idx] || []), ...state.org];
+      const row = state.rows[idx] || { fields: [], schedule: null };
+      const fields = [...row.fields, ...state.org];
       const results = await chrome.scripting.executeScript({
         target: { tabId: tab.id, allFrames: true },
-        func: (f) => UFRA_FILL.run(f),
-        args: [fields]
+        func: (f, a, s) => UFRA_FILL.run(f, a, { schedule: s }),
+        args: [fields, state.answers, row.schedule]
       });
       renderReport(mergeReports(results));
     } catch (err) {
@@ -185,6 +202,23 @@ async function main() {
       target: { tabId: tab.id, allFrames: true },
       func: () => UFRA_FILL.clearHighlights()
     });
+  });
+
+  // For bug reports: what the extension sees on this page, on the clipboard.
+  $('diagnose').addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      const tab = await activeTab();
+      await injectInto(tab.id);
+      const results = await chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: true },
+        func: () => UFRA_FILL.diagnose()
+      });
+      await navigator.clipboard.writeText(results.map((r) => r.result).filter(Boolean).join('\n\n'));
+      e.target.textContent = 'Copied — paste it to Claude';
+    } catch (err) {
+      e.target.textContent = `Couldn't copy: ${err.message}`;
+    }
   });
 
   document.addEventListener('click', (e) => {

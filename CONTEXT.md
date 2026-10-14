@@ -24,6 +24,18 @@ whole instructions or questions ("Indicate how many people you expect to
 attend"), not as short field names.
 _Avoid_: label, question, field name
 
+**Form**:
+Which website the page belongs to, detected from its address: an EMS
+room request (rooms.ufl.edu) or a GatorConnect event. Standing answers and
+form-specific steps are scoped by Form. There is no toggle.
+_Avoid_: mode, site, template
+
+**GatorConnect event**:
+The event permit, submitted as "Create Event" on gatorconnect.ufl.edu over
+several pages the user moves between by hand. Each of its dates is its own
+Booking, added with "+ add another date", with its own place.
+_Avoid_: permit form, event registration
+
 **Acknowledgement**:
 A Prompt that states terms the requester must accept rather than asking
 anything about the event. Always answered Yes, often carrying a financial or
@@ -48,6 +60,19 @@ suggests — advisor, emergency, rain, 2nd. The reason "2nd Contact Phone" must
 not receive the 1st contact's number.
 _Avoid_: modifier, disambiguator
 
+**Finalized Information**:
+The hand-written Column recording what was actually booked: dates, times and
+rooms, one Booking per line or spread over several. It wins over the
+requested date and time for whatever it states; anything it leaves out is
+borrowed from the request. "<-" means the same as requested; "holiday" or
+"cancelled" drop a Booking.
+_Avoid_: confirmed info, final booking
+
+**Standing answer**:
+A line of data/answers.csv: an answer given whenever a Prompt contains a
+phrase, on one Form or all. Acknowledgements need none; they are always Yes.
+_Avoid_: default, preset
+
 ### Outcomes
 
 Every control on a page ends in exactly one of these.
@@ -62,3 +87,7 @@ two Columns were nearly tied.
 **Blank**:
 Left untouched, either because no Column matched or because the control
 already had a value.
+
+A value the page itself puts in while a fill runs (EMS defaulting the 1st
+Contact, GatorConnect's date of today) is not the user's and may be
+replaced. A value present before the fill began never is.

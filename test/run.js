@@ -39,7 +39,8 @@ const events = CSV.parseTable([
 let submitted = false;
 document.getElementById('ems').addEventListener('submit', () => { submitted = true; });
 
-const report = FILL.run([...events[0], ...org]);
+(async () => {
+const report = await FILL.run([...events[0], ...org], [], { settleWait: 300 });
 
 console.log('filled=%d review=%d prefilled=%d skipped=%d', report.filled, report.review, report.prefilled, report.skipped);
 console.log('---');
@@ -57,3 +58,4 @@ for (const el of document.querySelectorAll('input:not([type=hidden]), select, te
 console.log('--- invariants ---');
 console.log('form submitted:', submitted);
 console.log('phone preserved:', document.getElementById('phone').value === '352-000-0000');
+})();

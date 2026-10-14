@@ -1,7 +1,7 @@
 # UF Reservation Autofill
 
 A Chrome extension that fills University of Florida room reservation (EMS Cloud) and
-event permit forms from data you keep in a Google Sheet, so you stop retyping the same
+GatorConnect event permit forms from data you keep in a Google Sheet, so you stop retyping the same
 organization details on every request.
 
 It **never submits a form.** It fills, flags anything uncertain, and leaves the rest to you.
@@ -60,6 +60,13 @@ Grove Day Social	75	09/12/2026, 3:00pm - 5:00pm	Reitz Union 2365	Banquet
 ```
 
 A cell like `09/12/2026, 3:00pm - 5:00pm` is split into a date, a start time and an end time.
+
+**GatorConnect event permits.** The extension recognises gatorconnect.ufl.edu by itself.
+Dates come from *Finalized Information* — one Booking per line, each with its own room —
+falling back to the requested date and time for anything it leaves out. It clicks
+"+ add another date" and "In-Person" as needed, types the Description into the rich-text
+editor, and leaves Theme, Categories, Perks, Show To and the co-host search to you. The
+form spans several pages; click Fill Form on each.
 If a separate *Reservation Date* column disagrees with it, date fields are filled but outlined
 for review.
 
@@ -89,6 +96,9 @@ node test/run.js     # end-to-end fill against a mock EMS-style form
 node test/edge.js    # labels that must not be confidently autofilled
 node test/paste.js   # a row copied from the events sheet
 node test/compound.js # "advisor, email and phone" in one box
+node test/answers.js  # Registrar Yes/No menus answered from data/answers.csv
+node test/bookings.js # Bookings read from real Finalized Information cells
+node test/gatorconnect.js # GatorConnect Create Event, several dates
 ```
 
 ## Layout
@@ -97,6 +107,9 @@ node test/compound.js # "advisor, email and phone" in one box
 | --- | --- |
 | [src/csv.js](src/csv.js) | RFC-4180 parser for CSV and copied (tab-separated) cells; detects key/value vs header+row sheets |
 | [src/row.js](src/row.js) | Pasted row → fields: header matching, tracking columns, date/time range splitting |
+| [src/bookings.js](src/bookings.js) | Free-text cell → Bookings (date, times, room), guessing years and am/pm |
+| [src/forms.js](src/forms.js) | Form detection; GatorConnect's extra dates, In-Person button, Description editor |
+| [src/answers.js](src/answers.js) | Standing Yes/No answers: attendance thresholds, data/answers.csv, acknowledgements |
 | [src/schema.js](src/schema.js) | Canonical fields, synonyms, qualifier words, normalisation |
 | [src/matcher.js](src/matcher.js) | Label scoring, header→field mapping, confidence + ambiguity |
 | [src/fill.js](src/fill.js) | Content script: label discovery, value coercion, writing, highlighting |

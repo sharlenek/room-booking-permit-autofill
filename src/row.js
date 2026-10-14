@@ -1,6 +1,6 @@
 /* Turns a row copied out of the events sheet into the fields the matcher
    scores, using the header row saved once on the options page. */
-var UFRA_ROW = (function (CSV, M) {
+var UFRA_ROW = (function (CSV, M, B) {
 
   /* Columns that track the request rather than describe the event. They are
      off by default so "notes" or "price" never land in a form prompt; the
@@ -52,6 +52,62 @@ var UFRA_ROW = (function (CSV, M) {
     if (!meridiem(start) && meridiem(end)) start += meridiem(end);
     var date = m[1] ? m[1].split('/').map(function (n) { return String(+n); }).join('/') : null;
     return { date: date, start: start, end: end };
+  }
+
+  function refOf(date) {
+    var p = String(date || '').split('/');
+    return p.length === 3 ? { y: +p[2], m: +p[0], d: +p[1] } : null;
+  }
+
+  /* The Bookings an event actually has. Finalized Information wins for
+     whatever it states -- a date, a time, a room -- and anything it leaves
+     out comes from the requested date-and-time column: "LIT0121, 5-8pm"
+     keeps the requested date, "9/10/2026, CSE222" the requested time.
+     Returns {source, cancelled, sessions: [{date, start, end, place,
+     guessed}]}, or null when the row has no schedule at all. */
+  function schedule(headers, values) {
+    var finalized = null;
+    var requested = null;
+    headers.forEach(function (header, i) {
+      var h = String(header || '');
+      if (/finali[sz]ed/i.test(h)) { finalized = { label: h, value: values[i] }; return; }
+      var read = B.parse(values[i]);
+      if (!read.bookings.some(function (b) { return b.date && b.start; })) return;
+      // A column headed with "time" beats one that merely mentions a time
+      // range in passing, like a description saying "6-8pm".
+      if (!requested || (/time/i.test(h) && !/time/i.test(requested.label))) {
+        requested = { label: h, read: read };
+      }
+    });
+
+    var req = requested ? requested.read.bookings : [];
+    var fin = finalized ? B.parse(finalized.value, req.length ? refOf(req[0].date) : null)
+                        : { bookings: [], cancelled: false };
+    if (fin.cancelled) return { source: finalized.label, cancelled: true, sessions: [] };
+    if (!fin.bookings.length) {
+      return requested ? { source: requested.label, cancelled: false, sessions: req } : null;
+    }
+
+    function merge(f, r) {
+      r = r || {};
+      return {
+        date: f.date || r.date || null,
+        start: f.start || r.start || null,
+        end: f.start ? f.end : (r.end || null),
+        place: f.place || r.place || '',
+        guessed: f.guessed
+      };
+    }
+    var sessions;
+    if (fin.bookings.length === 1 && !fin.bookings[0].date && req.length) {
+      // One undated line ("Reitz 2355") applies to every requested date.
+      sessions = req.map(function (r) { return merge(fin.bookings[0], r); });
+    } else {
+      sessions = fin.bookings.map(function (f) {
+        return merge(f, req.find(function (r) { return r.date === f.date; }) || req[0]);
+      });
+    }
+    return { source: finalized.label, cancelled: false, sessions: sessions };
   }
 
   /* headers: the saved header row. values: one data row, same order. */
@@ -109,10 +165,12 @@ var UFRA_ROW = (function (CSV, M) {
     defaultUse: defaultUse,
     isUsed: isUsed,
     splitDateTimeRange: splitDateTimeRange,
+    schedule: schedule,
     toFields: toFields,
     readPaste: readPaste
   };
 })(typeof UFRA_CSV !== 'undefined' ? UFRA_CSV : require('./csv.js'),
-   typeof UFRA_MATCH !== 'undefined' ? UFRA_MATCH : require('./matcher.js'));
+   typeof UFRA_MATCH !== 'undefined' ? UFRA_MATCH : require('./matcher.js'),
+   typeof UFRA_BOOKINGS !== 'undefined' ? UFRA_BOOKINGS : require('./bookings.js'));
 
 if (typeof module !== 'undefined') module.exports = UFRA_ROW;

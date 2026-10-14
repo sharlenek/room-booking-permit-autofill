@@ -74,12 +74,19 @@ var UFRA_CSV = (function () {
     // Two columns is ambiguous: it reads as either key/value or header+row.
     // Three or more rows can only be key/value; with exactly two rows we need
     // an explicit "Field,Value"-style header to choose it over header+row.
+    // A "Field,Value" header settles it outright, so one unquoted comma in a
+    // value ("PO Box 1, Gainesville, FL") cannot flip the whole sheet into
+    // header+row; the extra cells are rejoined into the value instead.
     var kvHeader = /^(field|key|item|name|property)$/i.test(rows[0][0] || '');
-    if (maxWidth <= 2 && (rows.length > 2 || kvHeader)) {
+    if (kvHeader || (maxWidth <= 2 && rows.length > 2)) {
       var start = kvHeader ? 1 : 0;
       return rows.slice(start)
         .filter(function (r) { return !isBlank(r[0]); })
-        .map(function (r) { return { label: r[0], value: r[1] || '' }; });
+        .map(function (r) {
+          var rest = r.slice(1);
+          while (rest.length && isBlank(rest[rest.length - 1])) rest.pop();
+          return { label: r[0], value: rest.join(', ') };
+        });
     }
 
     var headers = rows[0];
