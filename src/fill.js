@@ -50,8 +50,12 @@ var UFRA_FILL = (function (S, M, A, F) {
     });
   }
 
+  function optionLabelEl(r) {
+    return r.closest('label') || (r.id && r.ownerDocument.querySelector('label[for="' + cssEscape(r.id) + '"]')) || null;
+  }
+
   function optionLabel(r) {
-    var l = r.closest('label') || (r.id && r.ownerDocument.querySelector('label[for="' + cssEscape(r.id) + '"]'));
+    var l = optionLabelEl(r);
     return l ? textOf(l).replace(/\s+/g, ' ').trim() : '';
   }
 
@@ -131,10 +135,25 @@ var UFRA_FILL = (function (S, M, A, F) {
   }
 
   function isFillable(el) {
-    if (el.disabled || el.readOnly) return false;
-    if (el.tagName === 'INPUT' && SKIP_INPUT_TYPES.indexOf(el.type) !== -1) return false;
-    if (el.closest('[aria-hidden="true"]')) return false;
-    return isVisible(el);
+    return !unfillableBecause(el);
+  }
+
+  /* Why a control cannot be filled, or '' when it can. */
+  function unfillableBecause(el) {
+    if (el.disabled) return 'disabled';
+    if (el.readOnly) return 'read-only';
+    if (el.tagName === 'INPUT' && SKIP_INPUT_TYPES.indexOf(el.type) !== -1) return 'skipped type';
+    // A styled checkbox hides the real box -- off screen, behind
+    // aria-hidden, or under a drawn one -- and shows its label or a drawn
+    // box instead. Clicking the real box still works.
+    if ((el.type === 'checkbox' || el.type === 'radio') && !isVisible(el)) {
+      var l = optionLabelEl(el);
+      if (l && isVisible(l)) return '';
+      if (el.parentElement && isVisible(el.parentElement)) return '';
+      return 'hidden, and so is its label';
+    }
+    if (el.closest('[aria-hidden="true"]')) return 'inside aria-hidden';
+    return isVisible(el) ? '' : 'hidden';
   }
 
   // A "-- Select --" or "Choose one" first option counts as empty.
@@ -155,6 +174,10 @@ var UFRA_FILL = (function (S, M, A, F) {
     return !String(el.value || '').trim() || /^\s*\*/.test(el.value);
   }
 
+  // An option that says yes, including an agreement menu's only choice,
+  // "I agree" (EMS: "I am an authorized representative of this organization").
+  var YES_OPTION = /^(yes|i agree|agree|i understand|i acknowledge|i accept)\b/;
+
   /* A select or radio group whose only real choices are Yes and/or No,
      however worded ("Yes, I understand"). An acknowledgement may offer Yes
      alone. */
@@ -172,8 +195,8 @@ var UFRA_FILL = (function (S, M, A, F) {
       return false;
     }
     var norm = texts.map(function (t) { return S.normalize(t); }).filter(Boolean);
-    return norm.some(function (t) { return /^yes\b/.test(t); }) &&
-      norm.every(function (t) { return /^(yes|no|n a|not applicable)\b/.test(t); });
+    return norm.some(function (t) { return YES_OPTION.test(t); }) &&
+      norm.every(function (t) { return YES_OPTION.test(t) || /^(no|n a|not applicable)\b/.test(t); });
   }
 
   /* ---------- value coercion ---------- */
@@ -182,7 +205,8 @@ var UFRA_FILL = (function (S, M, A, F) {
     'august', 'september', 'october', 'november', 'december'];
 
   function parseDate(v) {
-    var s = String(v).trim();
+    // EMS writes a weekday first: "Wed 11/04/2026".
+    var s = String(v).trim().replace(/^(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?,?\s+/i, '');
     var m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
     if (m) return { y: +m[1], m: +m[2], d: +m[3] };
 
@@ -297,7 +321,8 @@ var UFRA_FILL = (function (S, M, A, F) {
       : (NEGATIVE.test(String(value).trim()) ? 'no' : null);
     if (!want) return null;
     var opt = Array.prototype.slice.call(el.options).find(function (o) {
-      return !isPlaceholder(o) && new RegExp('^' + want + '\\b').test(S.normalize(o.text));
+      var t = S.normalize(o.text);
+      return !isPlaceholder(o) && (want === 'yes' ? YES_OPTION.test(t) : /^no\b/.test(t));
     });
     if (!opt) return null;
     setNativeValue(el, opt.value);
@@ -305,12 +330,19 @@ var UFRA_FILL = (function (S, M, A, F) {
     return { written: opt.text, exact: true };
   }
 
+  /* Tick a box the way a person does, so the page's own scripts (EMS uses
+     Knockout, which watches clicks) see it; fall back to setting it. */
+  function tick(el) {
+    if (el.checked) return;
+    el.click();
+    if (!el.checked) { el.checked = true; notify(el); }
+  }
+
   function fillCheckbox(el, value) {
     // Only ever tick a box, never untick one, and only on a clear yes.
     if (!AFFIRMATIVE.test(String(value).trim())) return null;
-    el.checked = true;
-    notify(el);
-    return { written: 'checked', exact: false };
+    tick(el);
+    return el.checked ? { written: 'checked', exact: false } : null;
   }
 
   function fillRadioGroup(el, value) {
@@ -330,8 +362,7 @@ var UFRA_FILL = (function (S, M, A, F) {
       });
     });
     if (!best || bestScore < M.UNCERTAIN) return null;
-    best.checked = true;
-    notify(best);
+    tick(best);
     return { written: optionLabel(best) || best.value, exact: bestScore >= M.CONFIDENT, element: best };
   }
 
@@ -372,8 +403,12 @@ var UFRA_FILL = (function (S, M, A, F) {
         el.tagName.toLowerCase() + (el.type && el.tagName === 'INPUT' ? ':' + el.type : ''),
         el.id ? '#' + el.id : '',
         el.name ? 'name=' + el.name : '',
-        isFillable(el) ? '' : 'NOT-FILLABLE',
+        unfillableBecause(el) ? 'NOT-FILLABLE(' + unfillableBecause(el) + ')' : '',
         isEmpty(el) ? 'empty' : 'has-value',
+        // The shape of a dated or timed value, never the value itself:
+        // "Aaa 99/99/9999".
+        !isEmpty(el) && el.tagName === 'INPUT' && /^(text|date|time)$/.test(el.type) && /\d/.test(el.value)
+          ? 'shape="' + el.value.replace(/[0-9]/g, '9').replace(/[A-Z]/g, 'A').replace(/[a-z]/g, 'a') + '"' : '',
         isYesNo(el) ? 'yes/no' : ''
       ].filter(Boolean).join(' ');
       lines.push('- ' + flags);
@@ -397,6 +432,59 @@ var UFRA_FILL = (function (S, M, A, F) {
       })
       .filter(Boolean);
     if (clickables.length) lines.push('buttons and links:', '    ' + clickables.join(', '));
+
+    // Around visible checkboxes (EMS's Add/Remove pop-up): the pop-up the
+    // extension settles on, and everything in it that might close it.
+    var shownBoxes = Array.prototype.filter.call(document.querySelectorAll('input[type="checkbox"]'),
+      function (c) { return isFillable(c); });
+    if (shownBoxes.length && F.dialogOf) {
+      var dlg = F.dialogOf(shownBoxes.slice(0, 1));
+      var chain = [];
+      for (var a = shownBoxes[0].parentElement; a && a !== document.body && chain.length < 8; a = a.parentElement) {
+        chain.push(a.tagName.toLowerCase() + (a.id ? '#' + a.id : '') +
+          (a.getAttribute('class') ? '.' + a.getAttribute('class').trim().split(/\s+/).slice(0, 2).join('.') : '') +
+          '(' + getComputedStyle(a).position + ')' + (a === dlg ? '*' : ''));
+      }
+      lines.push('around the visible checkboxes (* = taken as the pop-up):', '    ' + chain.join(' < '));
+      var near = Array.prototype.filter.call(dlg.querySelectorAll('*'), function (el) {
+        return isVisible(el) && !/^(INPUT|LABEL|OPTION)$/.test(el.tagName) && textOf(el).length <= 20 &&
+          (getComputedStyle(el).cursor === 'pointer' || el.matches('button, a, svg, i, img, [onclick], [role]'));
+      }).slice(0, 20).map(function (el) {
+        return el.tagName.toLowerCase() + (el.getAttribute('class') ? '.' + el.getAttribute('class').trim().split(/\s+/).slice(0, 3).join('.') : '') +
+          (el.getAttribute('aria-label') ? '[' + el.getAttribute('aria-label') + ']' : '') +
+          (el.getAttribute('title') ? '{' + el.getAttribute('title') + '}' : '') + ' ' + JSON.stringify(textOf(el));
+      });
+      lines.push('clickable things in it:', '    ' + (near.join(', ') || '(none)'));
+    }
+
+    // Inside an open pop-up, everything that might close it, icons too.
+    var dialogs = Array.prototype.filter.call(
+      document.querySelectorAll('[role="dialog"], .modal, .ui-dialog, [class*="dialog"], [class*="modal"]'),
+      function (d) {
+        // Bootstrap marks the page itself "modal-open" while a pop-up shows;
+        // that is not a pop-up, and neither is one inside another.
+        if (d === document.body || d === document.documentElement || !isVisible(d)) return false;
+        for (var up = d.parentElement; up && up !== document.body; up = up.parentElement) {
+          if (up.matches('[role="dialog"], .modal, .ui-dialog, [class*="dialog"], [class*="modal"]')) return false;
+        }
+        return true;
+      });
+    dialogs.forEach(function (d) {
+      var bits = Array.prototype.filter.call(
+        d.querySelectorAll('button, a, span, i, svg, img, td, [onclick], [data-dismiss], [data-bs-dismiss], [role="button"], [data-day], [data-date]'),
+        function (el) { return isVisible(el); })
+        .slice(0, 50)
+        .map(function (el) {
+          var cls = String(el.getAttribute('class') || '').trim().split(/\s+/).slice(0, 3).join('.');
+          var t = textOf(el).slice(0, 20);
+          var day = el.getAttribute('data-day') || el.getAttribute('data-date');
+          return el.tagName.toLowerCase() + (cls ? '.' + cls : '') +
+            (el.getAttribute('aria-label') ? '[' + el.getAttribute('aria-label') + ']' : '') +
+            (day ? '{data-day=' + day + '}' : '') + (t ? ' ' + JSON.stringify(t) : '');
+        });
+      var dcls = String(d.getAttribute('class') || '').trim().split(/\s+/).slice(0, 3).join('.');
+      lines.push('open pop-up ' + d.tagName.toLowerCase() + (dcls ? '.' + dcls : '') + ':', '    ' + bits.join(', '));
+    });
     return lines.join('\n');
   }
 
@@ -413,6 +501,12 @@ var UFRA_FILL = (function (S, M, A, F) {
     var yesNo = isYesNo(el);
     if (yesNo) match = A.answer(promptsFor(el), rules, fields);
     var standing = !!match;
+    if (el.tagName === 'SELECT' && !yesNo) {
+      // "method of payment,Organization Funds" -- a standing answer beats a
+      // loose match on the sheet's own Payment Method.
+      match = A.forMenu(promptsFor(el), rules);
+      standing = !!match;
+    }
     if (el.type === 'checkbox') {
       // A checkbox is judged by its own label only: GatorConnect puts the
       // first option's text beside every other option.
@@ -535,6 +629,10 @@ var UFRA_FILL = (function (S, M, A, F) {
         labelOf: function (el) { return labelCandidates(el)[0] || ''; },
         setValue: function (el, v) { setNativeValue(el, v); notify(el); },
         highlight: highlight,
+        isFillable: isFillable,
+        optionLabel: optionLabel,
+        tick: tick,
+        answerCheckbox: function (el) { return A.checkbox(optionLabel(el), rules); },
         findValue: function (prompt) { return M.findValue(prompt, fields); },
         waitFor: function (test) { return waitFor(test, wait); }
       });

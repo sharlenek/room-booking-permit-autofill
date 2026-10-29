@@ -16,6 +16,9 @@ var UFRA_SCHEMA = (function () {
 
     contactName:    ['contact name', '=1st contact', 'requester name', 'your name', 'full name', 'name of requester', 'primary contact', 'event contact', 'requested by', 'submitted by'],
     contactEmail:   ['contact email', 'requester email', 'your email', 'email address', 'email', 'e-mail'],
+    // GatorConnect wants the submitter's own UF address, apart from the
+    // organization's contact email. Its "(UF email)" hint is a parenthetical.
+    ufEmail:        ['uf email', 'ufl email', 'submitter email', 'event submitter email', 'event submitter email address'],
     contactPhone:   ['contact phone', 'requester phone', 'your phone', 'phone number', 'phone', 'telephone', 'cell', 'mobile'],
     contactTitle:   ['contact title', 'position', 'role', 'title in organization'],
     ufid:           ['ufid', 'uf id', 'student id', 'gatorlink id number', 'university id'],
@@ -49,7 +52,9 @@ var UFRA_SCHEMA = (function () {
     food:           ['food', 'food service', 'will food be served', 'catering', 'refreshments'],
     alcohol:        ['alcohol', 'will alcohol be served', 'alcoholic beverages'],
     admissionFee:   ['admission fee', 'ticket price', 'cost to attend', 'will you charge admission', 'fee charged'],
-    fundingSource:  ['funding source', 'account number', 'chartfield', 'budget code', 'billing account', 'payment method'],
+    fundingSource:  ['funding source', 'budget code', 'billing account', 'payment method', 'method of payment'],
+    // The number itself, apart from how the event is paid for.
+    chartfield:     ['chartfield', 'chartfield number', 'chartfield string', 'account number', 'department id'],
     amplifiedSound: ['amplified sound', 'sound amplification', 'speakers', 'will amplified sound be used'],
     security:       ['security', 'security needed', 'ufpd', 'police'],
     coSponsors:     ['co-sponsors', 'cosponsor', 'partnering organizations', 'collaborating organizations']

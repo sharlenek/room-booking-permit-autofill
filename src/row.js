@@ -64,10 +64,13 @@ var UFRA_ROW = (function (CSV, M, B) {
      out comes from the requested date-and-time column: "LIT0121, 5-8pm"
      keeps the requested date, "9/10/2026, CSE222" the requested time.
      Returns {source, cancelled, sessions: [{date, start, end, place,
-     guessed}]}, or null when the row has no schedule at all. */
+     guessed}], requested: the request's own sessions, for booking a room},
+     or null when the row has no schedule at all. */
   function schedule(headers, values) {
     var finalized = null;
-    var requested = null;
+    var requested = null;   // a column with dates and times together
+    var datesOnly = null;   // "Reservation Date": 11/4/2026
+    var timesOnly = null;   // "Reservation date and time": 5:30pm - 8:30pm
     headers.forEach(function (header, i) {
       var h = String(header || '');
       if (/finali[sz]ed/i.test(h)) { finalized = { label: h, value: values[i] }; return; }
@@ -75,13 +78,30 @@ var UFRA_ROW = (function (CSV, M, B) {
       // mentions "on 9/24 from 6-8pm" is not, and its prose is not a room.
       if (!/date|time/i.test(h)) return;
       var read = B.parse(values[i]);
-      if (!read.bookings.some(function (b) { return b.date && b.start; })) return;
-      // A column headed with "time" beats one that merely mentions a time
-      // range in passing, like a description saying "6-8pm".
-      if (!requested || (/time/i.test(h) && !/time/i.test(requested.label))) {
-        requested = { label: h, read: read };
+      var dated = read.bookings.filter(function (b) { return b.date; });
+      var timed = read.bookings.filter(function (b) { return b.start; });
+      if (dated.some(function (b) { return b.start; })) {
+        // A column headed with "time" beats one that merely mentions a time
+        // range in passing.
+        if (!requested || (/time/i.test(h) && !/time/i.test(requested.label))) {
+          requested = { label: h, read: read };
+        }
+      } else if (dated.length && !datesOnly) {
+        datesOnly = { label: h, bookings: dated };
+      } else if (timed.length && !timesOnly) {
+        timesOnly = { label: h, bookings: timed };
       }
     });
+
+    // The date in one column and the time in another: each requested date
+    // takes the requested time.
+    if (!requested && datesOnly && timesOnly) {
+      var t = timesOnly.bookings[0];
+      requested = { label: datesOnly.label + ' + ' + timesOnly.label, read: { bookings:
+        datesOnly.bookings.map(function (d) {
+          return { date: d.date, start: t.start, end: t.end, place: '', guessed: d.guessed || t.guessed };
+        }) } };
+    }
 
     // The request says when, never where: the room comes from Finalized
     // Information or the room preference column.
@@ -90,9 +110,9 @@ var UFRA_ROW = (function (CSV, M, B) {
     }) : [];
     var fin = finalized ? B.parse(finalized.value, req.length ? refOf(req[0].date) : null)
                         : { bookings: [], cancelled: false };
-    if (fin.cancelled) return { source: finalized.label, cancelled: true, sessions: [] };
+    if (fin.cancelled) return { source: finalized.label, cancelled: true, sessions: [], requested: req, requestedLabel: requested ? requested.label : '' };
     if (!fin.bookings.length) {
-      return requested ? { source: requested.label, cancelled: false, sessions: req } : null;
+      return requested ? { source: requested.label, cancelled: false, sessions: req, requested: req, requestedLabel: requested ? requested.label : '' } : null;
     }
 
     function merge(f, r) {
@@ -114,7 +134,7 @@ var UFRA_ROW = (function (CSV, M, B) {
         return merge(f, req.find(function (r) { return r.date === f.date; }) || req[0]);
       });
     }
-    return { source: finalized.label, cancelled: false, sessions: sessions };
+    return { source: finalized.label, cancelled: false, sessions: sessions, requested: req, requestedLabel: requested ? requested.label : '' };
   }
 
   /* headers: the saved header row. values: one data row, same order. */

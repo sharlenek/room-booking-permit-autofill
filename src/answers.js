@@ -84,6 +84,11 @@ var UFRA_ANSWERS = (function (S) {
     if (!String(ownLabel || '').trim()) {
       return { value: 'Yes', label: 'agreement checkbox', confidence: 'uncertain' };
     }
+    // "I have read and agree to the Terms and Conditions" is an
+    // Acknowledgement, and those are always accepted.
+    if (/^i (have read|agree|acknowledge|understand|accept|am aware)\b/i.test(ownLabel.trim())) {
+      return { value: 'Yes', label: 'acknowledgement', confidence: 'confident' };
+    }
     var hit = fromRules(ownLabel, rules);
     if (hit) return hit;
     var fallback = (rules || []).find(function (r) { return r.phrase === '*'; });
@@ -93,7 +98,16 @@ var UFRA_ANSWERS = (function (S) {
     return null;
   }
 
-  return { checkbox: checkbox, fromCsvRows: fromCsvRows, rulesFrom: rulesFrom, answer: answer, isAcknowledgement: isAcknowledgement };
+  /* A menu that is not Yes/No, by a standing answer only. */
+  function forMenu(prompts, rules) {
+    for (var i = 0; i < prompts.length; i++) {
+      var a = fromRules(prompts[i], rules);
+      if (a) return a;
+    }
+    return null;
+  }
+
+  return { forMenu: forMenu, checkbox: checkbox, fromCsvRows: fromCsvRows, rulesFrom: rulesFrom, answer: answer, isAcknowledgement: isAcknowledgement };
 })(typeof UFRA_SCHEMA !== 'undefined' ? UFRA_SCHEMA : require('./schema.js'));
 
 if (typeof module !== 'undefined') module.exports = UFRA_ANSWERS;

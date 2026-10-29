@@ -104,6 +104,10 @@ var UFRA_MATCH = (function (S) {
     // can never want a name as its answer.
     if (S.isPolarQuestion(pageLabel) && !S.isPolarValue(field.value)) best *= 0.3;
 
+    // "Provide the 15 digit chartfield ... Dept ID #" wants a number; a
+    // value with no digits at all (the word "Chartfield") cannot be it.
+    if (/\bdigits?\b|#/i.test(pageLabel) && !/\d/.test(String(field.value))) best *= 0.3;
+
     return best;
   }
 

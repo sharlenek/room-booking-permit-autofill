@@ -92,14 +92,14 @@ function check(name, got, want) {
   console.log((ok ? 'ok    ' : 'FAIL  ') + name.padEnd(44) + JSON.stringify(got) + (ok ? '' : `  (wanted ${JSON.stringify(want)})`));
 }
 
-async function fill(doc, values, before) {
+async function fill(doc, values, before, headers = HEADERS) {
   const { FILL, ROW, MATCH } = load();
   if (before) before(doc);
-  const fields = ROW.toFields(HEADERS, values, {}).concat([
+  const fields = ROW.toFields(headers, values, {}).concat([
     { label: 'Organization Name', value: 'Citrus Growers Club', canon: 'orgName' },
     { label: 'Organization Address', value: 'PO Box 1, Gainesville, FL', canon: 'orgAddress' }
   ]);
-  return FILL.run(fields, [], { schedule: ROW.schedule(HEADERS, values), settleWait: 400 });
+  return FILL.run(fields, [], { schedule: ROW.schedule(headers, values), settleWait: 400 });
 }
 const val = (doc, name) => doc.querySelector(`[name="${name}"]`).value;
 
@@ -141,6 +141,27 @@ const val = (doc, name) => doc.querySelector(`[name="${name}"]`).value;
   doc = page();
   await fill(doc, ['Social', '30', 'TBD', 'Reitz 2365', 'Join us on 9/24 from 6-8pm for games.', '']);
   check('description is not a room', val(doc, 'Instances[0].ExternalLocation'), 'Reitz 2365');
+
+  // The date in one column, the time in another, Finalized Information with
+  // only a time and a room, and a ranked list of room preferences.
+  const SPLIT = ['Event name', 'Estimated attendance', 'Reservation Date',
+    'Reservation date and time (e.g. 09/16/2024, 6:00pm - 8:00pm)', 'Room preference',
+    'Please provide a detailed description and the purpose of your event (1-2 sentences).', 'Finalized Information'];
+  const ranked = '(1) TUR-L005\n(2) TUR-L011\n(3) MCC-0100\n(4) TUR-L007';
+  doc = page();
+  await fill(doc, ['TBD - Cultural Committee', '60', '11/4/2026', '5:30pm - 8:30pm', ranked, 'Showcase.',
+    '7:30-9:30 turl 2319'], null, SPLIT);
+  check('split columns: Finalized time on requested date',
+    val(doc, 'Instances[0].StartDate') + ' ' + val(doc, 'Instances[0].StartTime') + '-' + val(doc, 'Instances[0].EndTime'),
+    '04 Nov 2026 07:30 PM-09:30 PM');
+  check('split columns: Finalized room', val(doc, 'Instances[0].ExternalLocation'), 'turl 2319');
+  doc = page();
+  report = await fill(doc, ['TBD - Cultural Committee', '60', '11/4/2026', '5:30pm - 8:30pm', ranked, 'Showcase.', ''],
+    null, SPLIT);
+  check('split columns: requested time', val(doc, 'Instances[0].StartTime') + '-' + val(doc, 'Instances[0].EndTime'),
+    '05:30 PM-08:30 PM');
+  check('ranked preferences are not the room', val(doc, 'Instances[0].ExternalLocation'), '');
+  check('ranked preferences: reported', report.details.some((d) => /several rooms/.test(d.note || '')), true);
 
   // A date the user already set is theirs.
   doc = page();
@@ -241,6 +262,34 @@ const val = (doc, name) => doc.querySelector(`[name="${name}"]`).value;
   check('page 3: expected number of attendees', doc.getElementById('n').value, '80');
   await fill3('300');
   check('page 3: 300 attending, 250+ -> Yes', ticked('bigy'), true);
+
+  // The submitter's own phone and UF email, from the organization details.
+  // The UF email is not the organization's contact email.
+  const page4 = new JSDOM(`<form>
+    <label for="answerTextBox-50300259-free">Event submitter phone number</label>
+    <input type="text" id="answerTextBox-50300259-free" name="pageResponse.Responses[fta50300259].FreeText">
+    <label for="answerTextBox-50300260-free">Event submitter email address (UF email)</label>
+    <input type="text" id="answerTextBox-50300260-free" name="pageResponse.Responses[fta50300260].FreeText">
+    <a href="#">keyboard_arrow_leftPREVIOUS</a><button type="button">NEXT keyboard_arrow_right</button>
+  </form>`, { pretendToBeVisual: true,
+    url: 'https://gatorconnect.ufl.edu/submitter/organization/ufsase/eventsubmission/additionalInfo/14704616' });
+  Object.assign(global, { window: page4.window, document: page4.window.document,
+    getComputedStyle: page4.window.getComputedStyle, Event: page4.window.Event, CSS: page4.window.CSS });
+  page4.window.Element.prototype.getClientRects = () => [{ width: 10, height: 10 }];
+  doc = page4.window.document;
+  {
+    const { FILL, ROW, MATCH } = load();
+    // As popup.js reads org.csv.
+    const org = [['Contact Email', 'club@gmail.com'], ['Phone Number', '8134827254'], ['UF Email', 'skho1@ufl.edu']]
+      .map(([label, value]) => {
+        const hit = MATCH.headerToCanon(label);
+        return { label, value, canon: hit ? hit.canon : null };
+      });
+    const values = ['GBM', '80', '09/22/2026, 6:00pm - 8:00pm', 'Reitz 2365', 'Meeting.', ''];
+    await FILL.run([...ROW.toFields(HEADERS, values, {}), ...org], [], { schedule: ROW.schedule(HEADERS, values), settleWait: 300 });
+  }
+  check('page 4: submitter phone', doc.getElementById('answerTextBox-50300259-free').value, '8134827254');
+  check('page 4: submitter UF email', doc.getElementById('answerTextBox-50300260-free').value, 'skho1@ufl.edu');
 
   console.log(failures ? `\n${failures} failure(s)` : '\nall GatorConnect checks pass');
   process.exitCode = failures ? 1 : 0;

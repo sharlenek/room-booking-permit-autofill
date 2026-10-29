@@ -61,6 +61,12 @@ Grove Day Social	75	09/12/2026, 3:00pm - 5:00pm	Reitz Union 2365	Banquet
 
 A cell like `09/12/2026, 3:00pm - 5:00pm` is split into a date, a start time and an end time.
 
+**Reitz Union room requests (EMS).** On *1 Rooms* the extension fills the date and times
+from the row's requested date and time (never Finalized Information, which is what got
+booked); you pick the room. With several requested dates it opens **Recurrence**: evenly
+spaced dates become Weekly, anything else (a holiday skipped) is Random with the exact dates. On *2 Reservation Details* it fills the rest, answering Reitz's
+questions from data/answers.csv and ticking styled checkboxes by clicking their labels.
+
 **GatorConnect event permits.** The extension recognises gatorconnect.ufl.edu by itself.
 Dates come from *Finalized Information* — one Booking per line, each with its own room —
 falling back to the requested date and time for anything it leaves out. It clicks
@@ -105,6 +111,8 @@ node test/answers.js  # Registrar Yes/No menus answered from data/answers.csv
 node test/bookings.js # Bookings read from real Finalized Information cells
 node test/gatorconnect.js # GatorConnect Create Event, several dates
 node test/finalize.js # Finalized Information from an EMS page and an .ics file
+node test/reitzform.js # Reitz Union request, steps 1 and 2
+node test/recurrence.js # EMS Recurrence: weekly series, and exact dates via Random
 ```
 
 ## Layout
